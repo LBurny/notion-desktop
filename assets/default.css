@@ -1,0 +1,197 @@
+/* ========== 文本自动对齐 ========== */
+.notion-text-block {
+  text-align: justify;
+}
+
+/* ========== 全局字体：思源宋体 CN + Times New Roman ========== */
+[data-testid="page-title"],
+.notion-page-block .notion-page-block,
+.notion-page-block .notion-selectable,
+.notion-scroller > div > [data-block-id] .notion-page-block,
+.notion-page-block > div > div[contenteditable="true"],
+.notion-page-block > div > div[contenteditable="true"] *,
+.notion-header-block,
+.notion-sub_header-block,
+.notion-sub_sub_header-block,
+.notion-header-block *,
+.notion-sub_header-block *,
+.notion-sub_sub_header-block *,
+.notion-text-block,
+.notion-to_do-block,
+.notion-bulleted_list-block,
+.notion-numbered_list-block,
+.notion-quote-block,
+.notion-callout-block,
+.notion-toggle-block,
+.notion-table-block,
+.notion-bookmark-block,
+.notion-page-content,
+h1,
+h1 *,
+[placeholder="Untitled"],
+[placeholder="Page title"],
+[placeholder="Heading 1"],
+[contenteditable="true"]:first-of-type,
+[contenteditable="true"]:first-of-type *,
+.notion-table_of_contents-block,
+.notion-table_of_contents-block *,
+.notion-link-page,
+.notion-link-page *,
+.notion-page-link,
+.notion-page-link *,
+.notion-page-view-header,
+.notion-page-view-header *,
+.notion-page-header,
+.notion-page-header *,
+.notion-page-block div[contenteditable="true"],
+.notion-page-block div[contenteditable="true"] *,
+.notion-sidebar,
+.notion-sidebar *,
+.notion-topbar,
+.notion-topbar *,
+.notion-breadcrumb,
+.notion-breadcrumb * {
+  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", serif !important;
+}
+
+/* ========== 代码块 Consolas 字体 ========== */
+.notion-code-block,
+.notion-code-block pre,
+.notion-code-block code,
+.notion-code-block * {
+  font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
+}
+
+/* ========== 公式统一使用数学字体 ========== */
+.notion-text-block .katex:not(.katex-display .katex),
+.notion-text-block .katex:not(.katex-display .katex) * {
+  font-family: "KaTeX_Main", "Times New Roman", serif !important;
+}
+
+/* ========== 覆盖 Ctrl+K 搜索框 ========== */
+[role="dialog"],
+[role="dialog"] *,
+[role="search"],
+[role="search"] *,
+[placeholder="Search"],
+[placeholder="Search"] *,
+[placeholder="Search or jump to…"],
+[placeholder="Search or jump to…"] *,
+[placeholder="Type a command or search…"],
+[placeholder="Type a command or search…"] *,
+input[type="text"],
+input[type="text"] *,
+.notion-overlay-container,
+.notion-overlay-container *,
+.notion-dialog,
+.notion-dialog *,
+.notion-quick-find,
+.notion-quick-find *,
+.notion-search,
+.notion-search * {
+  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", serif !important;
+}
+[role="dialog"] .notion-code-block,
+[role="dialog"] .notion-code-block *,
+[role="dialog"] .katex,
+[role="dialog"] .katex * {
+  font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
+}
+
+/* ========== 加粗字重调整 ========== */
+strong,
+b,
+.notion-page-content strong {
+  font-weight: 600 !important;
+}
+
+/* ========== 行间距 ========== */
+.notion-text-block,
+.notion-bulleted_list-block,
+.notion-numbered_list-block,
+.notion-to_do-block,
+.notion-quote-block,
+.notion-callout-block,
+.notion-toggle-block,
+.notion-table-block,
+.notion-bookmark-block,
+.notion-header-block,
+.notion-sub_header-block,
+.notion-sub_sub_header-block,
+[data-testid="page-title"] {
+  line-height: 1.73;
+}
+
+.notion-code-block {
+  line-height: 1.6;
+}
+
+/* ========== 暗黑模式字体亮度调暗 ========== */
+.dark .notion-text-block,
+.dark .notion-header-block,
+.dark .notion-sub_header-block,
+.dark .notion-sub_sub_header-block,
+.dark .notion-bulleted_list-block,
+.dark .notion-numbered_list-block,
+.dark .notion-to_do-block,
+.dark .notion-quote-block,
+.dark .notion-callout-block,
+.dark .notion-toggle-block,
+.dark .notion-table-block,
+.dark .notion-bookmark-block,
+.dark [data-testid="page-title"],
+.dark [placeholder="Untitled"],
+.dark [placeholder="Page title"],
+.dark [placeholder="Heading 1"],
+.dark [contenteditable="true"],
+.dark .notion-page-block,
+.dark .notion-sidebar,
+.dark .notion-topbar,
+.dark .notion-breadcrumb,
+.dark .notion-link-page,
+.dark .notion-page-link,
+.dark .notion-page-view-header,
+.dark .notion-page-header,
+.dark .notion-table_of_contents-block,
+.dark .notion-code-block,
+.dark .notion-code-block pre,
+.dark .notion-code-block code,
+.dark .katex {
+  color: #d4d4d4 !important;
+}
+
+.dark .notion-header-block {
+  color: #e0e0e0 !important;
+}
+
+.dark .notion-sub_header-block {
+  color: #d8d8d8 !important;
+}
+
+.dark .notion-sub_sub_header-block {
+  color: #d4d4d4 !important;
+}
+
+.dark [data-testid="page-title"] {
+  color: #e8e8e8 !important;
+}
+
+.dark .notion-sidebar .notion-page-link:hover,
+.dark .notion-topbar *:hover {
+  color: #e0e0e0 !important;
+}
+
+.dark .notion-link-page,
+.dark a.notion-link-page {
+  color: #b0c9e0 !important;
+}
+
+/* ========== 顶栏一体化：隐藏 Notion 自带顶栏（功能由自定义标题栏接管） ========== */
+/* 压成 0 高但保留布局与可脚本点击：display:none 会让弹菜单锚点丢失，勿用 */
+.notion-topbar {
+  height: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important; /* 不挡内容区首行 hover/点击，脚本 .click() 不受影响 */
+}

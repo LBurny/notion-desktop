@@ -1,0 +1,40 @@
+{
+  "name": "notion-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Notion 桌面套壳：主题跟随 + CSS 注入",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "dist": "electron-builder"
+  },
+  "build": {
+    "appId": "com.local.notion-desktop",
+    "productName": "Notion Desktop",
+    "files": [
+      "src/**",
+      "assets/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "assets/tray.png"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://example.com/updates"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Notion Desktop"
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.4.1",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,54 @@
+:root, html[data-theme="light"] {
+  --bg: #ffffff; --fg: #37352f; --hover: rgba(0, 0, 0, 0.06);
+  --input-bg: #f7f7f7; --border: rgba(0, 0, 0, 0.14); --hint: rgba(55, 53, 47, 0.55);
+}
+html[data-theme="dark"] {
+  --bg: #252525; --fg: #d4d4d4; --hover: rgba(255, 255, 255, 0.08);
+  --input-bg: #1a1a1a; --border: rgba(255, 255, 255, 0.14); --hint: rgba(212, 212, 212, 0.5);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px;
+  user-select: none;
+}
+#titlebar {
+  height: 34px; flex: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding-left: 12px;
+  -webkit-app-region: drag;
+  border-bottom: 1px solid var(--border);
+}
+#close {
+  -webkit-app-region: no-drag;
+  width: 40px; height: 34px; border: 0; background: transparent; color: var(--fg);
+}
+#close:hover { background: #e81123; color: #fff; }
+#form { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.row { display: flex; align-items: center; gap: 10px; }
+.row .name { width: 92px; flex: none; }
+input[type="text"], input[type="number"] {
+  flex: 1; min-width: 0;
+  height: 28px; padding: 0 8px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--input-bg); color: var(--fg);
+  font-size: 13px; outline: none;
+}
+input[type="text"]:focus, input[type="number"]:focus { border-color: #2383e2; }
+#zoom-group { display: flex; align-items: center; gap: 8px; }
+#zoom-group button {
+  width: 28px; height: 28px;
+  border: 1px solid var(--border); border-radius: 4px;
+  background: var(--input-bg); color: var(--fg); font-size: 15px;
+}
+#zoom-group button:hover { background: var(--hover); }
+#zoom-label { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; }
+.check { cursor: default; }
+.check input { accent-color: #2383e2; }
+#hint {
+  margin: 0; color: #2383e2; font-size: 12px;
+  opacity: 0; transition: opacity 0.25s;
+}
+#hint.show { opacity: 1; }

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <button id="sidebar-toggle" class="topbar-btn" title="打开侧边栏">&#9776;</button>
+  <div id="tabs"></div>
+  <button id="new-tab" title="新建标签页 (Ctrl+T)">&#43;</button>
+  <div id="drag-region"></div>
+  <div id="topbar-actions">
+    <button id="tb-share" class="topbar-btn" title="分享">Share</button>
+    <button id="tb-favorite" class="topbar-btn" title="收藏">&#9734;</button>
+    <button id="tb-more" class="topbar-btn" title="更多">&#8943;</button>
+  </div>
+  <div id="controls">
+    <button id="min" title="最小化">&#8211;</button>
+    <button id="max" title="最大化">&#9634;</button>
+    <button id="close" title="关闭">&#10005;</button>
+  </div>
+  <script src="tab-drag.js"></script>
+  <script src="titlebar.js"></script>
+</body>
+</html>

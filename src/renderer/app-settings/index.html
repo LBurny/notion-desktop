@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="titlebar">
+    <span>设置</span>
+    <button id="close" title="关闭">&#10005;</button>
+  </div>
+  <div id="form">
+    <div class="section first">快捷键</div>
+    <label class="row">
+      <span class="name">放大页面</span>
+      <input id="hk-zoomIn" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+    </label>
+    <label class="row">
+      <span class="name">缩小页面</span>
+      <input id="hk-zoomOut" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+    </label>
+    <label class="row">
+      <span class="name">显示 / 隐藏</span>
+      <input id="hk-toggleWindow" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+    </label>
+    <div class="section">关闭窗口时</div>
+    <label class="row check">
+      <input id="close-tray" type="radio" name="closeAction" value="tray" />
+      <span>最小化到托盘</span>
+    </label>
+    <label class="row check">
+      <input id="close-quit" type="radio" name="closeAction" value="quit" />
+      <span>退出程序</span>
+    </label>
+    <p id="hint"></p>
+  </div>
+  <script src="hotkey-capture.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>

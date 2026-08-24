@@ -1,0 +1,67 @@
+:root, html[data-theme="light"] {
+  --bg: #ffffff; --fg: #37352f; --hover: rgba(0, 0, 0, 0.06);
+  --tab-active: #ececea; --hint: rgba(55, 53, 47, 0.55);
+}
+html[data-theme="dark"] {
+  --bg: #191919; --fg: #d4d4d4; --hover: rgba(255, 255, 255, 0.08);
+  --tab-active: #2e2e2e; --hint: rgba(212, 212, 212, 0.5);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 36px; overflow: hidden; }
+body {
+  display: flex;
+  background: var(--bg); color: var(--fg);
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px;
+  user-select: none;
+}
+#tabs {
+  flex: 0 1 auto; display: flex; align-items: stretch;
+  overflow: hidden; height: 100%;
+  -webkit-app-region: no-drag;
+}
+.tab {
+  flex: 0 1 180px; min-width: 72px;
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 6px 0 10px; margin: 5px 1px 0;
+  border-radius: 6px 6px 0 0;
+  color: var(--hint); font-size: 12px;
+  cursor: default; position: relative;
+}
+.tab.active { background: var(--tab-active); color: var(--fg); }
+.tab:not(.active):hover { background: var(--hover); }
+.tab .tab-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab .tab-close {
+  flex: none; width: 18px; height: 18px; border: 0; border-radius: 4px;
+  background: transparent; color: inherit; font-size: 11px; line-height: 1;
+}
+.tab .tab-close:hover { background: var(--hover); }
+.tab.dragging { opacity: 0.85; z-index: 10; }
+#new-tab {
+  flex: none; width: 28px; margin: 5px 2px 0; border: 0; border-radius: 6px 6px 0 0;
+  background: transparent; color: var(--fg); font-size: 15px;
+  -webkit-app-region: no-drag;
+}
+#new-tab:hover { background: var(--hover); }
+#new-tab:disabled { opacity: 0.35; }
+#drag-region {
+  flex: 1; -webkit-app-region: drag;
+}
+#sidebar-toggle { flex: none; width: 36px; }
+#topbar-actions { display: flex; align-items: stretch; }
+#topbar-actions.hidden { display: none; } /* 错误页等非 Notion 页面时隐藏 */
+.topbar-btn {
+  -webkit-app-region: no-drag;
+  min-width: 34px; padding: 0 8px; border: 0; background: transparent;
+  color: var(--fg); font-size: 13px;
+}
+.topbar-btn:hover { background: var(--hover); }
+#tb-favorite { font-size: 16px; }
+#tb-favorite.favorited { color: #e8a13a; } /* 实心星着色 */
+#controls { display: flex; }
+#controls button {
+  -webkit-app-region: no-drag;
+  width: 46px; border: 0; background: transparent; color: var(--fg);
+  font-size: 14px;
+}
+#controls button:hover { background: var(--hover); }
+#close:hover { background: #e81123 !important; color: #fff; }

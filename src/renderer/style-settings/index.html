@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="titlebar">
+    <span>样式</span>
+    <button id="close" title="关闭">&#10005;</button>
+  </div>
+  <div id="form">
+    <label class="row">
+      <span class="name">字体</span>
+      <input id="font" type="text" list="font-list" placeholder="默认：思源宋体 CN" />
+      <datalist id="font-list"></datalist>
+    </label>
+    <label class="row">
+      <span class="name">行间距</span>
+      <input id="lineHeight" type="number" min="1" max="3" step="0.01" />
+    </label>
+    <label class="row">
+      <span class="name">段落间距 (px)</span>
+      <input id="paragraphSpacing" type="number" min="0" max="30" step="1" />
+    </label>
+    <div class="row">
+      <span class="name">页面缩放</span>
+      <div id="zoom-group">
+        <button id="zoom-out" title="缩小 1%">&#8722;</button>
+        <span id="zoom-label">100%</span>
+        <button id="zoom-in" title="放大 1%">&#43;</button>
+      </div>
+    </div>
+    <label class="row check">
+      <input id="hideHelp" type="checkbox" />
+      <span>屏蔽右下角帮助按钮</span>
+    </label>
+    <p id="hint"></p>
+  </div>
+  <script src="font-detect.js"></script>
+  <script src="settings.js"></script>
+</body>
+</html>
