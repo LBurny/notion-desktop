@@ -16,9 +16,14 @@ function parseRegOutput(text) {
   for (const line of String(text || '').split(/\r?\n/)) {
     const m = line.match(/^\s+(.+?)\s+REG_SZ\s+/);
     if (!m) continue;
-    const name = m[1].replace(/\s+\((TrueType|OpenType|PostScript)\)\s*$/, '').trim();
-    if (!name || VARIANT_RE.test(name)) continue;
-    out.push(name);
+    const raw = m[1].replace(/\s+\((TrueType|OpenType|PostScript)\)\s*$/, '').trim();
+    if (!raw) continue;
+    // TTC 合集在注册表是一条 'A & B'，拆成独立字族（Word 也分别列出）
+    for (const name of raw.split(/\s+&\s+/)) {
+      const n = name.trim();
+      if (!n || VARIANT_RE.test(n)) continue;
+      out.push(n);
+    }
   }
   return out;
 }
@@ -29,15 +34,25 @@ function mergeFontLists(...lists) {
   return [...set].sort((a, b) => a.localeCompare(b, 'zh-CN'));
 }
 
+// 中文 Windows 上 reg.exe 按系统 ANSI 代码页（GBK）输出，直接 utf8 解码会得到乱码
+function decodeRegOutput(buf) {
+  if (!Buffer.isBuffer(buf)) return String(buf || '');
+  try {
+    return new TextDecoder('gbk').decode(buf);
+  } catch {
+    return buf.toString('utf8');
+  }
+}
+
 function listSystemFonts() {
   const lists = [];
   for (const key of REG_KEYS) {
     try {
-      const out = execSync(`reg query "${key}"`, { encoding: 'utf8', windowsHide: true });
-      lists.push(parseRegOutput(out));
+      const out = execSync(`reg query "${key}"`, { windowsHide: true });
+      lists.push(parseRegOutput(decodeRegOutput(out)));
     } catch { /* 某个键不存在时忽略 */ }
   }
   return mergeFontLists(...lists);
 }
 
-module.exports = { parseRegOutput, mergeFontLists, listSystemFonts };
+module.exports = { parseRegOutput, mergeFontLists, decodeRegOutput, listSystemFonts };

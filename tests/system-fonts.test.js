@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseRegOutput, mergeFontLists } = require('../src/main/system-fonts');
+const { parseRegOutput, mergeFontLists, decodeRegOutput } = require('../src/main/system-fonts');
 
 const SAMPLE = `
 HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Fonts
@@ -39,6 +39,24 @@ test('parseRegOutput 过滤粗斜体等样式变体，保留独立字族', () =>
 test('parseRegOutput 空输入返回空表', () => {
   assert.deepEqual(parseRegOutput(''), []);
   assert.deepEqual(parseRegOutput('not a reg output\nnoise'), []);
+});
+
+test('decodeRegOutput 按 GBK 解码中文 Windows 的 reg 输出', () => {
+  // 中文系统里 reg.exe 用 ANSI(GBK) 输出：’微软雅黑’ 的 GBK 字节如下
+  const gbk = Buffer.from('CE A2 C8 ED D1 C5 BA DA'.replace(/ /g, ''), 'hex');
+  const buf = Buffer.concat([Buffer.from('    '), gbk, Buffer.from(' (TrueType)    REG_SZ    msyh.ttc\r\n')]);
+  const fonts = parseRegOutput(decodeRegOutput(buf));
+  assert.ok(fonts.includes('微软雅黑'));
+});
+
+test('parseRegOutput 拆分 TTC 合并注册项（A & B）', () => {
+  const text = '    Microsoft YaHei & Microsoft YaHei UI (TrueType)    REG_SZ    msyh.ttc\r\n'
+    + '    Microsoft YaHei Light & Microsoft YaHei UI Light (TrueType)    REG_SZ    msyhl.ttc\r\n';
+  const fonts = parseRegOutput(text);
+  assert.ok(fonts.includes('Microsoft YaHei'));
+  assert.ok(fonts.includes('Microsoft YaHei UI'));
+  assert.ok(fonts.includes('Microsoft YaHei Light'));
+  assert.ok(fonts.includes('Microsoft YaHei UI Light'));
 });
 
 test('mergeFontLists 合并去重并按中文排序', () => {

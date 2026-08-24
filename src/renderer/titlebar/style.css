@@ -7,6 +7,8 @@ html[data-theme="dark"] {
   --tab-active: #2e2e2e; --hint: rgba(212, 212, 212, 0.5);
 }
 * { box-sizing: border-box; }
+/* button 默认用 UA 控件字体、不继承 body，需显式继承才能跟随样式设置 */
+button { font-family: inherit; }
 html, body { margin: 0; height: 36px; overflow: hidden; }
 body {
   display: flex;
