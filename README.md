@@ -1,8 +1,57 @@
 # Notion Desktop
 
-Notion 网页版（notion.so）的 Windows 桌面套壳，Electron 43。
+[English](#english) | [中文](#中文)
 
-## 功能
+---
+
+## English
+
+A Windows desktop wrapper for [Notion](https://notion.so), built on Electron 43.
+
+### Features
+
+- **Browser-style tabs**: Ctrl+T opens Notion's Quick Find on the current page — a new tab is created only when you pick a result. Ctrl+W to close, Ctrl+1-9 to jump, Ctrl+PageDown/PageUp to cycle, drag to reorder, lazy-loaded session restore on restart
+- **Unified title bar**: tab strip + sidebar toggle (☰) + Share/Favorite/Actions, replacing Notion's own top bar
+- **Theme following**: tracks Notion's dark/light mode across the window, tray menu and settings
+- **Custom styles**: injected CSS (font / line-height / paragraph spacing / page zoom / hide help button), edit `custom.css` with hot reload
+- **Tray resident**: minimize to tray with quick access to style & settings windows; choose whether closing the window quits or hides to tray
+- **Customizable hotkeys**: rebind global shortcuts for zoom and show/hide
+
+### Develop
+
+```bash
+npm install
+npm start        # dev mode
+npm test         # unit tests (node:test)
+npm run dist     # build NSIS installer into dist/
+```
+
+End-to-end check (launch the app with `--remote-debugging-port=9222` first):
+
+```bash
+node scripts/cdp-tabs-check.js 9222 "Notion Desktop"
+```
+
+### Structure
+
+```
+src/main/       main process (window, tray, tab glue, hotkeys, settings persistence)
+src/preload/    preload bridges (page, title bar, tray menu, settings)
+src/renderer/   four renderer pages: title bar / tray menu / style / settings
+tests/          node:test unit tests
+scripts/        CDP debugging & e2e scripts
+assets/         default injected CSS and icons
+```
+
+User data (settings, tab archive, `custom.css`) lives in `%APPDATA%/notion-desktop/`.
+
+---
+
+## 中文
+
+Notion 网页版（notion.so）的 Windows 桌面套壳，基于 Electron 43。
+
+### 功能
 
 - **浏览器式多标签**：Ctrl+T 在当前页唤起搜索，选中结果才开新标签；Ctrl+W 关闭、Ctrl+数字 跳转、Ctrl+PageDown/PageUp 循环切换、拖拽排序、重启后懒加载恢复
 - **一体化标题栏**：标签条 + 侧栏开关（☰）+ 分享/收藏/更多，隐藏 Notion 自带顶栏
@@ -11,7 +60,7 @@ Notion 网页版（notion.so）的 Windows 桌面套壳，Electron 43。
 - **托盘常驻**：最小化到托盘，托盘菜单快速打开样式/设置窗口；关闭动作可选「最小化到托盘」或「退出」
 - **快捷键自定义**：缩放、显示/隐藏窗口的全局快捷键可在设置中改绑
 
-## 开发
+### 开发
 
 ```bash
 npm install
@@ -26,7 +75,7 @@ npm run dist     # 打包 NSIS 安装包到 dist/
 node scripts/cdp-tabs-check.js 9222 "Notion Desktop"
 ```
 
-## 结构
+### 结构
 
 ```
 src/main/       主进程（窗口、托盘、标签粘合层、快捷键、设置持久化）
