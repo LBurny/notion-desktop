@@ -27,6 +27,7 @@ test('saveSettings + loadSettings 往返一致', () => {
     font: '思源宋体 CN', lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.05, hideHelp: true,
     hotkeys: { zoomIn: 'Ctrl+Alt+Q', zoomOut: 'Ctrl+Alt+W', toggleWindow: 'Ctrl+Alt+E' },
     closeAction: 'quit',
+    slashCommands: [{ combo: 'Ctrl+Shift+R', command: 'math' }],
   };
   saveSettings(f, s);
   assert.deepStrictEqual(loadSettings(f), s);
@@ -101,4 +102,30 @@ test('loadSettings 旧版文件（无快捷键字段）补齐默认值', () => {
   assert.deepStrictEqual(s.hotkeys, DEFAULT_SETTINGS.hotkeys);
   assert.strictEqual(s.closeAction, 'tray');
   assert.strictEqual(s.font, 'Test');
+});
+
+test('slashCommands 默认预置 math', () => {
+  const s = sanitizeSettings(null);
+  assert.deepStrictEqual(s.slashCommands, [{ combo: 'Ctrl+Shift+M', command: 'math' }]);
+});
+
+test('slashCommands 清洗：去斜杠、剔非法项、上限 10 条', () => {
+  const s = sanitizeSettings({
+    slashCommands: [
+      { combo: 'Ctrl+Shift+R', command: '/math' },
+      { combo: 'not a hotkey', command: 'x' },
+      { combo: 'Ctrl+Alt+T', command: '   ' },
+      ...Array.from({ length: 12 }, (_, i) => ({ combo: `Ctrl+Shift+F${(i % 12) + 1}`, command: 'c' + i })),
+    ],
+  });
+  assert.ok(s.slashCommands.some((c) => c.combo === 'Ctrl+Shift+R' && c.command === 'math'));
+  assert.ok(!s.slashCommands.some((c) => c.combo === 'not a hotkey'));
+  assert.ok(!s.slashCommands.some((c) => !c.command));
+  assert.ok(s.slashCommands.length <= 10);
+});
+
+test('slashCommands 返回值不共享 DEFAULT_SETTINGS 引用', () => {
+  const s = sanitizeSettings(null);
+  s.slashCommands.push({ combo: 'Ctrl+Shift+Q', command: 'x' });
+  assert.strictEqual(DEFAULT_SETTINGS.slashCommands.length, 1);
 });

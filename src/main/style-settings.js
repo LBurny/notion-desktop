@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
     toggleWindow: 'Ctrl+`',      // 显示 / 最小化到托盘
   },
   closeAction: 'tray', // 'tray' = 最小化到托盘；'quit' = 退出程序
+  slashCommands: [{ combo: 'Ctrl+Shift+M', command: 'math' }], // 斜杠命令快捷键（前台注入 /word + Enter）。注意 Ctrl+Shift+R 是 Chromium 保留键（强制刷新），事件到不了 before-input-event，不能作默认
 };
 
 const HOTKEY_RE = /^(Ctrl|Alt|Shift)(\+(Ctrl|Alt|Shift))*\+[^+]+$/;
@@ -28,8 +29,12 @@ function clampZoom(z) {
 }
 
 function sanitizeSettings(raw) {
-  // hotkeys 需深拷贝，避免合并用户值时改动 DEFAULT_SETTINGS
-  const s = { ...DEFAULT_SETTINGS, hotkeys: { ...DEFAULT_SETTINGS.hotkeys } };
+  // hotkeys / slashCommands 需深拷贝，避免合并用户值时改动 DEFAULT_SETTINGS
+  const s = {
+    ...DEFAULT_SETTINGS,
+    hotkeys: { ...DEFAULT_SETTINGS.hotkeys },
+    slashCommands: DEFAULT_SETTINGS.slashCommands.map((c) => ({ ...c })),
+  };
   if (raw && typeof raw === 'object') {
     if (typeof raw.font === 'string') s.font = raw.font.slice(0, 100);
     if (Number.isFinite(raw.lineHeight)) s.lineHeight = Math.min(3, Math.max(1, raw.lineHeight));
@@ -44,6 +49,17 @@ function sanitizeSettings(raw) {
       }
     }
     if (raw.closeAction === 'tray' || raw.closeAction === 'quit') s.closeAction = raw.closeAction;
+    if (Array.isArray(raw.slashCommands)) {
+      const list = [];
+      for (const item of raw.slashCommands) {
+        if (!item || !isValidHotkey(item.combo)) continue;
+        const command = String(item.command || '').replace(/^\/+/, '').trim().slice(0, 50);
+        if (!command) continue;
+        list.push({ combo: item.combo, command });
+        if (list.length >= 10) break;
+      }
+      s.slashCommands = list;
+    }
   }
   return s;
 }

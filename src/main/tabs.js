@@ -4,6 +4,7 @@ const { WebContentsView, shell } = require('electron');
 const { loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS } = require('./tab-manager');
 const { shortcutFor } = require('./tab-shortcuts');
 const { normalizePickedUrl } = require('./quick-find');
+const { findSlashCommand, runSlashCommand } = require('./slash-commands');
 const { buildClickScript, buildFavoriteStateScript } = require('./topbar-actions');
 
 const AUTH_POPUPS = [
@@ -17,6 +18,7 @@ function createTabs(deps) {
     win, manager, homeUrl, partition, preloadPath, errorPagePath,
     titlebarHeight,
     getCss, getZoom,
+    getSlashCommands, // () => [{ combo, command }]，斜杠命令快捷键配置
     onChanged,   // (payload) => void，payload = { tabs, canAdd }
     onEmpty,     // 最后一个标签被关闭
     onTopbarState, // ({ available, favorited }) => void，顶栏一体化状态推送
@@ -139,13 +141,23 @@ function createTabs(deps) {
     });
     wc.on('before-input-event', (e, input) => {
       const s = shortcutFor(input);
-      if (!s) return;
-      e.preventDefault(); // 页面收不到这些键，避免与 Notion 编辑器快捷键冲突
-      if (s.action === 'new-tab') newTabInteractive();
-      else if (s.action === 'close-tab') { const a = manager.active(); if (a) closeTab(a.id); }
-      else if (s.action === 'next-tab') nextTab();
-      else if (s.action === 'prev-tab') prevTab();
-      else if (s.action === 'position') activatePosition(s.position);
+      if (s) {
+        e.preventDefault(); // 页面收不到这些键，避免与 Notion 编辑器快捷键冲突
+        if (s.action === 'new-tab') newTabInteractive();
+        else if (s.action === 'close-tab') { const a = manager.active(); if (a) closeTab(a.id); }
+        else if (s.action === 'next-tab') nextTab();
+        else if (s.action === 'prev-tab') prevTab();
+        else if (s.action === 'position') activatePosition(s.position);
+        return;
+      }
+      // 斜杠命令快捷键（用户配置，before-input-event 天然仅前台生效）
+      if (!getSlashCommands) return;
+      const cmd = findSlashCommand(getSlashCommands(), input);
+      if (!cmd) return;
+      e.preventDefault();
+      // 延迟执行：等用户松开组合键（否则注入的 Enter 会带上未松开的 Ctrl/Shift），
+      // 也避免在 input 事件栈里重入输入管线
+      setTimeout(() => runSlashCommand(wc, cmd.command), 300);
     });
   }
 

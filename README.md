@@ -14,6 +14,7 @@ A Windows desktop wrapper for [Notion](https://notion.so), built on Electron 43.
 - **Custom styles**: injected CSS (font / line-height / paragraph spacing / page zoom / hide help button), edit `custom.css` with hot reload
 - **Tray resident**: minimize to tray with quick access to style & settings windows; choose whether closing the window quits or hides to tray
 - **Customizable hotkeys**: rebind global shortcuts for zoom and show/hide
+- **Slash-command hotkeys**: bind any `/command` to a shortcut — pressing it types `/word` and hits Enter for you (e.g. Ctrl+Shift+M → block equation). IME-safe, works while a Chinese input method is active
 
 ## Develop
 

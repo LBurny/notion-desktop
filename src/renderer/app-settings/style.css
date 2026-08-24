@@ -53,3 +53,19 @@ input.hotkey.capturing::placeholder { color: #2383e2; }
   opacity: 0; transition: opacity 0.25s;
 }
 #hint.show { opacity: 1; }
+.tip { margin: -6px 0 0; color: var(--hint); font-size: 11px; }
+.slash-row { gap: 6px; }
+.slash-hk { width: 130px; flex: none; }
+.slash-cmd { flex: 1; min-width: 0; }
+.slash-del {
+  flex: none; width: 24px; height: 24px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--fg); cursor: pointer; font-size: 11px;
+}
+.slash-del:hover { background: var(--hover); }
+#slash-add {
+  align-self: flex-start;
+  border: 1px dashed var(--border); border-radius: 6px;
+  background: transparent; color: var(--fg);
+  padding: 4px 12px; font-size: 12px; cursor: pointer;
+}
+#slash-add:hover { background: var(--hover); }

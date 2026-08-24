@@ -8,13 +8,14 @@ const { listSystemFonts } = require('../src/main/system-fonts');
 const TARGETS = {
   menu: { width: 150, height: 160, dir: 'tray-menu', preload: 'tray-menu.js' },
   style: { width: 340, height: 300, dir: 'style-settings', preload: 'settings.js' },
-  settings: { width: 340, height: 340, dir: 'app-settings', preload: 'settings.js' },
+  settings: { width: 340, height: 480, dir: 'app-settings', preload: 'settings.js' },
   tabs: { width: 900, height: 36, dir: 'titlebar', preload: 'titlebar.js' },
 };
 
 const DEMO_SETTINGS = {
   font: '思源宋体 CN', lineHeight: 1.73, paragraphSpacing: 4, zoom: 1.05, hideHelp: true,
   hotkeys: { zoomIn: 'Ctrl+Shift+=', zoomOut: 'Ctrl+Shift+-', toggleWindow: 'Ctrl+`' },
+  slashCommands: [{ combo: 'Ctrl+Shift+M', command: 'math' }, { combo: 'Ctrl+Shift+D', command: 'divider' }],
   closeAction: 'tray',
 };
 

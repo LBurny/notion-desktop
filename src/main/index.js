@@ -29,7 +29,7 @@ const TRAY_MENU_SIZE = { width: 150, height: 160 };
 // 「样式」与「设置」两个子窗口的配置；内容后续会持续扩充
 const SETTINGS_WINDOWS = {
   style: { height: 300, dir: 'style-settings' },
-  app: { height: 340, dir: 'app-settings' },
+  app: { height: 480, dir: 'app-settings' },
 };
 const settingsWins = { style: null, app: null };
 
@@ -236,6 +236,7 @@ app.whenReady().then(() => {
     titlebarHeight: TITLEBAR_HEIGHT,
     getCss: currentCss,
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
+    getSlashCommands: () => (styleSettings ? styleSettings.slashCommands : []),
     onChanged: () => {
       if (titlebarView && !titlebarView.webContents.isDestroyed()) {
         titlebarView.webContents.send('tabs-changed', tabs.payload());
