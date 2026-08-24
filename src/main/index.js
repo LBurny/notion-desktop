@@ -5,6 +5,7 @@ const { ensureCustomCss, readCombinedCss, watchCustomCss } = require('./css-mana
 const { calcMenuPosition } = require('./menu-position');
 const { loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss } = require('./style-settings');
 const { comboToAccelerator } = require('./hotkeys');
+const { listSystemFonts } = require('./system-fonts');
 const { createTabManager, saveTabsFile } = require('./tab-manager');
 const { createTabs } = require('./tabs');
 
@@ -278,11 +279,20 @@ app.whenReady().then(() => {
   });
 
   ipcMain.on('get-style-settings', (e) => { e.returnValue = styleSettings; });
+  // 系统字体枚举走注册表（与 Word 同源），结果进程级缓存
+  let cachedFonts = null;
+  ipcMain.on('system-fonts', (e) => {
+    if (!cachedFonts) cachedFonts = listSystemFonts();
+    e.returnValue = cachedFonts;
+  });
   ipcMain.handle('style-settings-update', (_e, raw) => {
     styleSettings = sanitizeSettings(raw);
     saveSettings(settingsFile, styleSettings);
     applyViewSettings();
     registerHotkeys();
+    if (titlebarView && !titlebarView.webContents.isDestroyed()) {
+      titlebarView.webContents.send('style-changed', styleSettings);
+    }
     return true;
   });
   ipcMain.on('settings-close', (e) => {

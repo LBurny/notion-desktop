@@ -3,6 +3,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const { listSystemFonts } = require('../src/main/system-fonts');
 
 const TARGETS = {
   menu: { width: 150, height: 160, dir: 'tray-menu', preload: 'tray-menu.js' },
@@ -31,6 +32,7 @@ app.whenReady().then(async () => {
   ipcMain.on('get-theme', (e) => { e.returnValue = theme; });
   ipcMain.on('tray-menu-action', () => {});
   ipcMain.on('get-style-settings', (e) => { e.returnValue = DEMO_SETTINGS; });
+  ipcMain.on('system-fonts', (e) => { e.returnValue = listSystemFonts(); });
   ipcMain.handle('style-settings-update', () => true);
   ipcMain.on('settings-close', () => {});
   // 标题栏（标签条）场景的通道桩

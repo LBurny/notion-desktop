@@ -13,6 +13,14 @@ window.titlebarApi.onMaximized((isMax) => {
   btnMax.innerHTML = isMax ? '&#10064;' : '&#9634;';
 });
 
+// 标题栏字体跟随样式设置（与页面正文同一字体）
+function applyStyleFont(s) {
+  const f = (s && s.font ? String(s.font) : '').trim().replace(/["\\]/g, '');
+  document.body.style.fontFamily = f ? `"${f}", "Segoe UI", sans-serif` : '';
+}
+applyStyleFont(window.titlebarApi.getStyle());
+window.titlebarApi.onStyle(applyStyleFont);
+
 // ---------- 标签条 ----------
 const tabsEl = document.getElementById('tabs');
 let currentTabs = [];

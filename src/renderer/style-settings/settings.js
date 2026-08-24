@@ -9,7 +9,12 @@ let settings = window.settingsApi.get();
   const toggle = $('font-toggle');
   const listEl = $('font-options');
   const { CANDIDATE_FONTS, filterAvailableFonts, isFontAvailable } = window.fontDetect;
-  const fonts = filterAvailableFonts(CANDIDATE_FONTS, isFontAvailable);
+  // 优先列出系统全部已安装字体（注册表枚举，与 Word 同源）；
+  // 枚举失败（如非 Windows）时退回候选名单 + canvas 探测
+  const sysFonts = window.settingsApi.systemFonts();
+  const fonts = (sysFonts && sysFonts.length)
+    ? sysFonts
+    : filterAvailableFonts(CANDIDATE_FONTS, isFontAvailable);
   let activeIdx = -1;
 
   const isOpen = () => !listEl.hidden;

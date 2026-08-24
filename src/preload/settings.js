@@ -7,4 +7,5 @@ contextBridge.exposeInMainWorld('settingsApi', {
   close: () => ipcRenderer.send('settings-close'),
   getTheme: () => ipcRenderer.sendSync('get-theme'),
   onTheme: (cb) => ipcRenderer.on('theme-changed', (_e, theme) => cb(theme)),
+  systemFonts: () => ipcRenderer.sendSync('system-fonts'),
 });

@@ -58,10 +58,11 @@ body {
 #tb-favorite { font-size: 16px; }
 #tb-favorite.favorited { color: #e8a13a; } /* 实心星着色 */
 #controls { display: flex; }
+/* 与 .topbar-btn 同宽同字号，与 Share/收藏/⋯ 视觉对齐 */
 #controls button {
   -webkit-app-region: no-drag;
-  width: 46px; border: 0; background: transparent; color: var(--fg);
-  font-size: 14px;
+  width: 34px; padding: 0; border: 0; background: transparent; color: var(--fg);
+  font-size: 13px;
 }
 #controls button:hover { background: var(--hover); }
 #close:hover { background: #e81123 !important; color: #fff; }

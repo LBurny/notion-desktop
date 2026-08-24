@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('titlebarApi', {
   getTheme: () => ipcRenderer.sendSync('get-theme'),
   onTheme: (cb) => ipcRenderer.on('theme-changed', (_e, theme) => cb(theme)),
   onMaximized: (cb) => ipcRenderer.on('window-maximized', (_e, flag) => cb(flag)),
+  getStyle: () => ipcRenderer.sendSync('get-style-settings'),
+  onStyle: (cb) => ipcRenderer.on('style-changed', (_e, s) => cb(s)),
 });
 
 contextBridge.exposeInMainWorld('tabsApi', {
