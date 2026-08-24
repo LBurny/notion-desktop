@@ -2,7 +2,8 @@
 // 选择器由 scripts/cdp-topbar-scan.js / cdp-topbar-tree2.js 侦察敲定，按优先级排列；
 // notion-* 类名稳定，aria-label 兜底（随界面语言变化）。Notion 改版时只需改这张表。
 const TOPBAR_ACTIONS = {
-  sidebar:  { selectors: ['.notion-open-sidebar', '.notion-topbar [aria-label="Lock sidebar open"]', '.notion-topbar [aria-label="Open sidebar"]'] },
+  // sidebar 是开关：收起态命中前几个“打开”钮，展开态它们全部落空、落到“收起”钮
+  sidebar:  { selectors: ['.notion-open-sidebar', '.notion-topbar [aria-label="Lock sidebar open"]', '.notion-topbar [aria-label="Open sidebar"]', '.notion-sidebar [aria-label="Close sidebar"]'] },
   share:    { selectors: ['.notion-topbar-share-menu', '.notion-topbar [aria-label="Share"]'] },
   favorite: { selectors: ['.notion-topbar-favorite-button', '.notion-topbar [aria-label="Favorite"]', '.notion-topbar [aria-label="Favorited"]'] },
   more:     { selectors: ['.notion-topbar-more-button', '.notion-topbar [aria-label="Actions"]'] },

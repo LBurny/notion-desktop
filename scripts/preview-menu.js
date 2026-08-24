@@ -73,17 +73,15 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(__dirname, '..', '.playwright-mcp', 'tabs-overflow.png'), img.toPNG());
     console.log('written tabs-overflow');
   }
-  // 样式页追加验证：「已保存」提示 + 字体下拉候选
+  // 样式页追加验证：字体下拉展开态（自绘列表，跟随主题，可滚动）
   if (name === 'style') {
-    await win.webContents.executeJavaScript("document.getElementById('zoom-in').click()");
-    await new Promise((r) => setTimeout(r, 500));
-    const img = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(__dirname, '..', '.playwright-mcp', 'style-dark-saved.png'), img.toPNG());
-    console.log('written style-dark-saved');
-    const fonts = await win.webContents.executeJavaScript(
-      "Array.from(document.querySelectorAll('#font-list option')).map((o) => o.value)"
+    const n = await win.webContents.executeJavaScript(
+      "document.getElementById('font-toggle').click(); document.querySelectorAll('#font-options li').length"
     );
-    console.log('datalist fonts:', JSON.stringify(fonts));
+    await new Promise((r) => setTimeout(r, 400));
+    const img = await win.webContents.capturePage();
+    fs.writeFileSync(path.join(__dirname, '..', '.playwright-mcp', 'style-font-open.png'), img.toPNG());
+    console.log('written style-font-open, options:', n);
   }
   win.destroy();
   app.quit();

@@ -34,6 +34,17 @@ test('buildClickScript 对未知动作抛错', () => {
   assert.throws(() => buildClickScript('nope'));
 });
 
+test('sidebar 动作是开关：开态下有收起按钮可点（选择器表含 Close sidebar）', () => {
+  // 开态：前几个“打开”选择器全部落空，必须落到收起按钮
+  const closeSel = TOPBAR_ACTIONS.sidebar.selectors.find((s) => s.includes('Close sidebar'));
+  assert.ok(closeSel, 'sidebar 选择器表缺少收起按钮');
+  let clicked = 0;
+  const el = { click: () => { clicked++; } };
+  const run = new Function('document', `return ${buildClickScript('sidebar')}`);
+  assert.strictEqual(run(stubDoc({ [closeSel]: el })), true);
+  assert.strictEqual(clicked, 1);
+});
+
 test('buildFavoriteStateScript 按 svg.starFill/star 判态，按钮缺失返回 null', () => {
   const script = buildFavoriteStateScript();
   const run = new Function('document', `return ${script}`);

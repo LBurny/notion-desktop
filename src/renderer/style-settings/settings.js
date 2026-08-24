@@ -2,15 +2,85 @@ const $ = (id) => document.getElementById(id);
 
 let settings = window.settingsApi.get();
 
-// 字体下拉只列出系统里真实安装的候选字体，仍可手动输入任意字体名
-(function fillFontList() {
-  const list = $('font-list');
+// 字体下拉：自绘可滚动列表（原生 datalist 弹层不跟主题、小窗内无法滚动）
+// 只列出系统真实安装的候选字体，每项直接用该字体渲染预览；仍可手动输入任意字体名
+(function setupFontCombo() {
+  const input = $('font');
+  const toggle = $('font-toggle');
+  const listEl = $('font-options');
   const { CANDIDATE_FONTS, filterAvailableFonts, isFontAvailable } = window.fontDetect;
-  for (const name of filterAvailableFonts(CANDIDATE_FONTS, isFontAvailable)) {
-    const opt = document.createElement('option');
-    opt.value = name;
-    list.appendChild(opt);
+  const fonts = filterAvailableFonts(CANDIDATE_FONTS, isFontAvailable);
+  let activeIdx = -1;
+
+  const isOpen = () => !listEl.hidden;
+  function close() { listEl.hidden = true; activeIdx = -1; }
+  function open() { render(''); listEl.hidden = false; } // 展开总是显示全量，过滤只发生在输入时
+
+  function render(filter) {
+    const f = (filter || '').trim().toLowerCase();
+    const shown = fonts.filter((n) => !f || n.toLowerCase().includes(f));
+    listEl.textContent = '';
+    activeIdx = -1;
+    if (!shown.length) {
+      const li = document.createElement('li');
+      li.className = 'empty';
+      li.textContent = '无匹配字体';
+      listEl.appendChild(li);
+      return;
+    }
+    for (const name of shown) {
+      const li = document.createElement('li');
+      li.textContent = name;
+      li.style.fontFamily = `"${name}"`;
+      // mousedown 先于 input 的 blur，preventDefault 保住焦点不打断选择
+      li.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        input.value = name;
+        settings.font = name;
+        push();
+        close();
+      });
+      listEl.appendChild(li);
+    }
   }
+
+  function moveActive(step) {
+    const items = listEl.querySelectorAll('li:not(.empty)');
+    if (!items.length) return;
+    activeIdx = (activeIdx + step + items.length) % items.length;
+    items.forEach((li, i) => li.classList.toggle('active', i === activeIdx));
+    items[activeIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  toggle.addEventListener('mousedown', (e) => e.preventDefault()); // 别抢 input 焦点
+  toggle.addEventListener('click', () => {
+    if (isOpen()) { close(); } else { open(); }
+    input.focus();
+  });
+  input.addEventListener('focus', open);
+  input.addEventListener('input', () => { render(input.value); listEl.hidden = false; });
+  input.addEventListener('blur', close);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!isOpen()) { open(); return; }
+      moveActive(e.key === 'ArrowDown' ? 1 : -1);
+    } else if (e.key === 'Enter' && isOpen()) {
+      const items = listEl.querySelectorAll('li:not(.empty)');
+      if (activeIdx >= 0 && items[activeIdx]) {
+        input.value = items[activeIdx].textContent;
+        settings.font = input.value;
+        push();
+      }
+      close();
+    } else if (e.key === 'Escape' && isOpen()) {
+      close();
+      e.stopPropagation();
+    }
+  });
+  document.addEventListener('mousedown', (e) => {
+    if (isOpen() && !$('font-combo').contains(e.target)) close();
+  });
 })();
 
 function render() {

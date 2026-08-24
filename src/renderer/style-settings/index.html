@@ -14,8 +14,11 @@
   <div id="form">
     <label class="row">
       <span class="name">字体</span>
-      <input id="font" type="text" list="font-list" placeholder="默认：思源宋体 CN" />
-      <datalist id="font-list"></datalist>
+      <div id="font-combo">
+        <input id="font" type="text" placeholder="默认：思源宋体 CN" autocomplete="off" spellcheck="false" />
+        <button id="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+        <ul id="font-options" hidden></ul>
+      </div>
     </label>
     <label class="row">
       <span class="name">行间距</span>
