@@ -1,6 +1,6 @@
 # Notion Desktop
 
-English | [中文](doc/README.zh-CN.md)
+English | [中文](docs/README.zh-CN.md)
 
 ---
 

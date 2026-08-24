@@ -3,3 +3,4 @@ dist/
 .playwright-mcp/
 *.log
 .DS_Store
+docs/superpowers/
