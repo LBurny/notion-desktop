@@ -1,6 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { TOPBAR_ACTIONS, pickTopbarButton, buildClickScript, buildFavoriteStateScript } = require('../src/main/topbar-actions');
+const {
+  TOPBAR_ACTIONS, pickTopbarButton, buildClickScript, buildFavoriteStateScript,
+  favoriteStateOf, quickFindStateOf, pageFontOf, CONTENT_FONT_SELECTORS,
+} = require('../src/main/topbar-actions');
 
 // 极简 DOM stub：按选择器表命中预设元素
 function stubDoc(map) {
@@ -56,4 +59,47 @@ test('buildFavoriteStateScript 按 svg.starFill/star 判态，按钮缺失返回
   assert.strictEqual(run(stubDoc({ [key]: favBtn('star') })), false);
   assert.strictEqual(run(stubDoc({ [key]: favBtn('other') })), null);
   assert.strictEqual(run(stubDoc({})), null);
+});
+
+// ── preload 内联探针的同源纯函数（沙箱 preload 无法 require 本地模块，
+//    content.js 里的实现镜像这里的逻辑，务必同步修改） ──
+
+test('favoriteStateOf 与 buildFavoriteStateScript 判态一致', () => {
+  const favBtn = (svgCls) => ({
+    querySelector: (sel) => (sel === 'svg.starFill' && svgCls === 'starFill') || (sel === 'svg.star' && svgCls === 'star') ? {} : null,
+  });
+  const key = TOPBAR_ACTIONS.favorite.selectors[0];
+  assert.strictEqual(favoriteStateOf(stubDoc({ [key]: favBtn('starFill') }), TOPBAR_ACTIONS.favorite.selectors), true);
+  assert.strictEqual(favoriteStateOf(stubDoc({ [key]: favBtn('star') }), TOPBAR_ACTIONS.favorite.selectors), false);
+  assert.strictEqual(favoriteStateOf(stubDoc({ [key]: favBtn('other') }), TOPBAR_ACTIONS.favorite.selectors), null);
+  assert.strictEqual(favoriteStateOf(stubDoc({}), TOPBAR_ACTIONS.favorite.selectors), null);
+});
+
+test('quickFindStateOf：带输入框的浮层才算 Quick Find 打开', () => {
+  const both = stubDoc({ '[role="dialog"] input': {}, '[role="dialog"]': {} });
+  assert.deepStrictEqual(quickFindStateOf(both), { open: true, anyDialog: true });
+  // 推广条也是 role=dialog 但没有 input：算有浮层、不算已开
+  const promo = { querySelector: (sel) => (sel === '[role="dialog"]' ? {} : null) };
+  assert.deepStrictEqual(quickFindStateOf(promo), { open: false, anyDialog: true });
+  assert.deepStrictEqual(quickFindStateOf(stubDoc({})), { open: false, anyDialog: false });
+});
+
+test('pageFontOf 返回 .notion-page-content 的计算字体', () => {
+  const el = {};
+  const gcs = (e) => ({ fontFamily: e === el ? '"思源宋体 CN", serif' : 'should-not-use' });
+  assert.strictEqual(pageFontOf(stubDoc({ '.notion-page-content': el }), gcs), '"思源宋体 CN", serif');
+});
+
+test('pageFontOf 首选元素缺失时按 CONTENT_FONT_SELECTORS 顺序回退', () => {
+  const el = {};
+  const fallbackSel = CONTENT_FONT_SELECTORS[1];
+  const gcs = (e) => ({ fontFamily: e === el ? '"X", serif' : '' });
+  assert.strictEqual(pageFontOf(stubDoc({ [fallbackSel]: el }), gcs), '"X", serif');
+});
+
+test('pageFontOf 页面未就绪或字体为空时返回 null', () => {
+  assert.strictEqual(pageFontOf(stubDoc({}), () => ({ fontFamily: 'x' })), null);
+  const el = {};
+  assert.strictEqual(pageFontOf(stubDoc({ [CONTENT_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '' })), null);
+  assert.strictEqual(pageFontOf(stubDoc({ [CONTENT_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '   ' })), null);
 });

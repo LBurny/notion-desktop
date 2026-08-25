@@ -1,11 +1,11 @@
 // 标签页粘合层：视图生命周期、导航跟踪、IPC 状态推送、持久化
 // 纯状态逻辑在 tab-manager.js，这里只做 Electron 侧的事
-const { WebContentsView, shell } = require('electron');
-const { loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS } = require('./tab-manager');
+const { WebContentsView, shell, ipcMain } = require('electron');
+const { loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground } = require('./tab-manager');
 const { shortcutFor } = require('./tab-shortcuts');
-const { normalizePickedUrl } = require('./quick-find');
+const { normalizePickedUrl, QUICK_FIND_RETRY_DELAYS, needsEscape } = require('./quick-find');
 const { findSlashCommand, runSlashCommand } = require('./slash-commands');
-const { buildClickScript, buildFavoriteStateScript } = require('./topbar-actions');
+const { TOPBAR_ACTIONS, CONTENT_FONT_SELECTORS } = require('./topbar-actions');
 
 const AUTH_POPUPS = [
   'https://accounts.google.com', 'https://appleid.apple.com',
@@ -16,19 +16,41 @@ const AUTH_POPUPS = [
 function createTabs(deps) {
   const {
     win, manager, homeUrl, partition, preloadPath, errorPagePath,
-    titlebarHeight,
+    getTitlebarHeight, // () => number，标题栏高度（随缩放变化）
     getCss, getZoom,
+    getTheme, // () => 'dark' | 'light'，视图加载期底色（防深色主题白闪）
     getSlashCommands, // () => [{ combo, command }]，斜杠命令快捷键配置
     onChanged,   // (payload) => void，payload = { tabs, canAdd }
     onEmpty,     // 最后一个标签被关闭
     onTopbarState, // ({ available, favorited }) => void，顶栏一体化状态推送
+    onPageFont,  // (fontFamily) => void，活动页面实际生效字体（供标题栏跟随）
     saveFile,
   } = deps;
 
   const records = new Map(); // id → { id, url, title, view: null, cssKey: null, reloaded: false }
 
+  // ── preload 探针往返 ──
+  // 页面 preload（隔离世界）可同步读 DOM，wc.send/ipcRenderer.send 往返约 1ms；
+  // executeJavaScript 在 Electron 43 上往返约 140ms（实测），延迟敏感路径全部走这里
+  function queryWc(wc, reqChannel, payload, resChannel, timeoutMs = 400) {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        ipcMain.removeListener(resChannel, onReply);
+        resolve(v);
+      };
+      const onReply = (e, data) => { if (e.sender === wc) finish(data); };
+      const timer = setTimeout(() => finish(null), timeoutMs); // 页面未就绪/preload 未加载 → null
+      ipcMain.on(resChannel, onReply);
+      try { wc.send(reqChannel, payload); } catch { finish(null); }
+    });
+  }
+
   // ── 顶栏一体化：动作转发与收藏状态回读 ──────────────────
-  // 页面顶栏被 CSS 隐藏，标题栏按钮点击转发到这里，在活动页面内点对应隐藏按钮
+  // 页面顶栏被 CSS 隐藏，标题栏按钮点击经 preload 在页面内点对应隐藏按钮
   function activeNotionWc() {
     const a = manager.active();
     const rec = a && records.get(a.id);
@@ -40,9 +62,7 @@ function createTabs(deps) {
   async function topbarAction(action) {
     const wc = activeNotionWc();
     if (!wc) { pushTopbarState(); return; }
-    try {
-      await wc.executeJavaScript(buildClickScript(action));
-    } catch { /* 页面加载中，忽略 */ }
+    try { wc.send('topbar-click', TOPBAR_ACTIONS[action].selectors); } catch { /* 视图销毁则忽略 */ }
     if (action === 'favorite') setTimeout(pushTopbarState, 400); // 等 Notion 落状态再回读
   }
 
@@ -52,10 +72,25 @@ function createTabs(deps) {
     stateTimer = setTimeout(async () => {
       const wc = activeNotionWc();
       if (!wc) { onTopbarState({ available: false, favorited: null }); return; }
-      let favorited = null;
-      try { favorited = await wc.executeJavaScript(buildFavoriteStateScript()); } catch { /* 保持 null */ }
-      onTopbarState({ available: true, favorited });
+      const favorited = await queryWc(
+        wc, 'topbar-favorite-query', TOPBAR_ACTIONS.favorite.selectors, 'topbar-favorite-state'
+      );
+      onTopbarState({ available: true, favorited: typeof favorited === 'boolean' ? favorited : null });
     }, 300);
+  }
+
+  // 页面实际生效字体 → onPageFont（标题栏跟随）。CSS 注入完成时正文可能尚未
+  // 渲染（Notion 懒加载），递远重试直到采到或放弃；custom.css 热更新由
+  // reinjectCss 对活动视图复采
+  async function probePageFont(rec, attempt = 0) {
+    const wc = rec.view && rec.view.webContents;
+    if (!wc || wc.isDestroyed() || wc.getURL().startsWith('file://')) return;
+    const font = await queryWc(wc, 'page-font-query', CONTENT_FONT_SELECTORS, 'page-font');
+    if (typeof font === 'string' && font.trim()) {
+      if (onPageFont) onPageFont(font);
+      return;
+    }
+    if (attempt < 4) setTimeout(() => probePageFont(rec, attempt + 1), 800 * (attempt + 1));
   }
 
   function layout() {
@@ -63,29 +98,51 @@ function createTabs(deps) {
     const active = manager.active();
     const rec = active && records.get(active.id);
     if (rec && rec.view) {
+      const tbHeight = getTitlebarHeight();
       rec.view.setBounds({
-        x: 0, y: titlebarHeight,
-        width, height: Math.max(0, height - titlebarHeight),
+        x: 0, y: tbHeight,
+        width, height: Math.max(0, height - tbHeight),
       });
     }
   }
 
   function ensureView(rec) {
     if (rec.view) return rec.view;
+    const bg = themeBackground(getTheme ? getTheme() : 'light');
+    // 加载期底色跟随主题：深色主题下默认白底会造成刺眼白闪。
+    // 注意：Electron 43 的 WebContentsView 构造选项没有 backgroundColor（传了会被静默忽略），
+    // 必须建实例后调用继承自 View 的 setBackgroundColor
     const view = new WebContentsView({
       webPreferences: { partition, preload: preloadPath },
     });
+    view.setBackgroundColor(bg);
     rec.view = view;
     wireViewEvents(rec);
     view.webContents.loadURL(rec.url);
     view.webContents.on('dom-ready', () => {
       if (view.webContents.isDestroyed()) return;
       view.webContents.insertCSS(getCss(), { cssOrigin: 'author' })
-        .then((k) => { rec.cssKey = k; })
+        .then((k) => { rec.cssKey = k; probePageFont(rec); })
         .catch(() => { /* 页面重载后注入失败可忽略 */ });
       view.webContents.setZoomFactor(getZoom());
     });
     return view;
+  }
+
+  // 设置或自定义 CSS 变化后重刷所有已建视图；活动视图注入完成后复采页面字体
+  function reinjectCss() {
+    const active = manager.active();
+    const activeRec = active ? records.get(active.id) : null;
+    forEachView((v, rec) => {
+      const wc = v.webContents;
+      const pre = rec.cssKey ? wc.removeInsertedCSS(rec.cssKey).catch(() => {}) : Promise.resolve();
+      pre.then(() => wc.insertCSS(getCss(), { cssOrigin: 'author' }))
+        .then((k) => {
+          rec.cssKey = k;
+          if (rec === activeRec) probePageFont(rec);
+        })
+        .catch(() => {});
+    });
   }
 
   // Notion 的 document.title 统一带 " | Notion" 后缀，标签条上纯属浪费宽度
@@ -198,22 +255,23 @@ function createTabs(deps) {
     return tab.id;
   }
 
-  function triggerQuickFind(view, { dismissFirst = false } = {}) {
-    // Notion 的 Quick Find 监听需在应用 JS 就绪后，三次递远重试兜底。
-    // Ctrl+K 是开关式的，所以每轮先查浮层是否已开，开了就不再注入；
-    // dismissFirst：未开时先送 Escape，关掉挡 shortcut 的其它浮层（如“在桌面应用打开？”推广条）。
-    // 冷启动首载很慢（注入早了会被丢弃），重试拉满 8s；自停止让多余轮次零成本
-    for (const d of [600, 1500, 3000, 5000, 8000]) {
+  function triggerQuickFind(view, { dismissFirst = false, armedRec = null } = {}) {
+    // 首轮 0ms：热页立即唤起。每轮先经 preload 查浮层状态（往返约 1ms），
+    // 已开则自停止；无阻挡浮层时跳过 Escape 直接注入 Ctrl+K（省 150ms+）。
+    // Ctrl+K 是开关式的，所以必须先查再注入；合成 KeyboardEvent 不可信，
+    // Notion 不响应，sendInputEvent 走真实输入管线（本路径验证无卡死）。
+    // armedRec（待命流程）下，待命解除（选中/取消/切标签）后必须停止后续轮次，
+    // 否则会把选中时刚关掉的浮层重新打开
+    for (const d of QUICK_FIND_RETRY_DELAYS) {
       setTimeout(async () => {
+        if (armedRec && (!pendingSearch || pendingSearch.rec !== armedRec)) return;
         const wc = view.webContents;
         if (wc.isDestroyed()) return;
         wc.focus();
-        let open = false;
-        try {
-          open = await wc.executeJavaScript(`!!document.querySelector('[role="dialog"] input')`);
-        } catch { /* 页面尚在加载，按未开处理继续注入 */ }
-        if (open) return;
-        if (dismissFirst) {
+        const st = await queryWc(wc, 'quick-find-state-query', null, 'quick-find-state');
+        if (armedRec && (!pendingSearch || pendingSearch.rec !== armedRec)) return;
+        if (st && st.open) return;
+        if (needsEscape(st, dismissFirst)) {
           wc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
           wc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
           await new Promise((r) => setTimeout(r, 150));
@@ -259,7 +317,7 @@ function createTabs(deps) {
       return newTab(homeUrl, { search: true });
     }
     armSearch(rec);
-    triggerQuickFind(rec.view, { dismissFirst: true });
+    triggerQuickFind(rec.view, { dismissFirst: true, armedRec: rec });
     return null;
   }
 
@@ -269,12 +327,15 @@ function createTabs(deps) {
     const url = normalizePickedUrl(href);
     if (!url) return;
     disarmSearch();
-    newTab(url);
-    // 关掉来源页上的搜索浮层（合成事件页面可能不认，走真实输入管线）
+    // 先关来源页上的搜索浮层，再开新标签。两处时序坑（均实测）：
+    // 1. newTab→attachActive 会把来源视图从窗口摘除，那之后注入的按键被丢弃；
+    // 2. 即使先注入，同 tick 内立即摘除也会丢掉还在队列里的按键——
+    //    必须留出 Escape 的处理时间再切标签
     if (!senderWc.isDestroyed()) {
       senderWc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
       senderWc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' });
     }
+    setTimeout(() => newTab(url), 150);
   }
 
   function quickFindDismissed(senderWc) {
@@ -353,10 +414,16 @@ function createTabs(deps) {
     return null;
   }
 
+  // 主题切换时同步所有已建视图的加载底色（下次加载/刷新不再闪白）
+  function setViewsBackground(theme) {
+    forEachView((v) => v.setBackgroundColor(themeBackground(theme)));
+  }
+
   return {
     newTab, closeTab, activateTab, nextTab, prevTab, activatePosition,
-    reorder, restore, layout, forEachView, findByWebContents,
+    reorder, restore, layout, forEachView, findByWebContents, reinjectCss,
     newTabInteractive, quickFindPicked, quickFindDismissed, topbarAction,
+    setViewsBackground,
     activeView: () => {
       const a = manager.active();
       const rec = a && records.get(a.id);

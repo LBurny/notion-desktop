@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS } = require('../src/main/tab-manager');
+const { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground } = require('../src/main/tab-manager');
 
 const URL = 'https://www.notion.so/';
 
@@ -122,4 +122,12 @@ test('loadTabsFile 文件不存在或损坏返回 null，saveTabsFile 可往返'
   const data = { tabs: [{ url: URL, title: 'A' }], activeIndex: 0 };
   saveTabsFile(f, data);
   assert.deepStrictEqual(loadTabsFile(f), data);
+});
+
+// ── 视图加载底色（新标签加载期防白闪） ──
+test('themeBackground 深色给 Notion 深色底、其余给白底', () => {
+  assert.strictEqual(themeBackground('dark'), '#191919');
+  assert.strictEqual(themeBackground('light'), '#ffffff');
+  assert.strictEqual(themeBackground('xxx'), '#ffffff');
+  assert.strictEqual(themeBackground(undefined), '#ffffff');
 });

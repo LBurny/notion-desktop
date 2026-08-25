@@ -115,4 +115,9 @@ function saveTabsFile(filePath, data) {
   fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
-module.exports = { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS };
+// 新标签加载期的视图底色：深色主题用 Notion 深色底（#191919），避免白闪
+function themeBackground(theme) {
+  return theme === 'dark' ? '#191919' : '#ffffff';
+}
+
+module.exports = { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground };

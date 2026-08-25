@@ -92,6 +92,8 @@ function render() {
   $('font').value = settings.font;
   $('lineHeight').value = settings.lineHeight;
   $('paragraphSpacing').value = settings.paragraphSpacing;
+  $('dividerWidth').value = settings.dividerWidth;
+  document.querySelector(`input[name="align"][value="${settings.align}"]`).checked = true;
   $('zoom-label').textContent = Math.round(settings.zoom * 100) + '%';
   $('hideHelp').checked = settings.hideHelp;
 }
@@ -126,6 +128,13 @@ $('lineHeight').addEventListener('input', (e) => {
 $('paragraphSpacing').addEventListener('input', (e) => {
   const v = Number(e.target.value);
   if (Number.isFinite(v)) { settings.paragraphSpacing = v; push(); }
+});
+$('dividerWidth').addEventListener('input', (e) => {
+  const v = Number(e.target.value);
+  if (Number.isFinite(v)) { settings.dividerWidth = v; push(); }
+});
+document.querySelectorAll('input[name="align"]').forEach((r) => {
+  r.addEventListener('change', (e) => { settings.align = e.target.value; commit(); });
 });
 $('zoom-out').addEventListener('click', () => {
   settings.zoom = Math.round((settings.zoom - 0.01) * 100) / 100;

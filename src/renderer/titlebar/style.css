@@ -1,10 +1,12 @@
 :root, html[data-theme="light"] {
   --bg: #ffffff; --fg: #37352f; --hover: rgba(0, 0, 0, 0.06);
   --tab-active: #ececea; --hint: rgba(55, 53, 47, 0.55);
+  --divider: rgba(55, 53, 47, 0.09); /* Notion 官方浅色分割线色 */
 }
 html[data-theme="dark"] {
   --bg: #191919; --fg: #d4d4d4; --hover: rgba(255, 255, 255, 0.08);
   --tab-active: #2e2e2e; --hint: rgba(212, 212, 212, 0.5);
+  --divider: rgba(255, 255, 255, 0.094); /* Notion 官方深色分割线色 */
 }
 * { box-sizing: border-box; }
 /* button 默认用 UA 控件字体、不继承 body，需显式继承才能跟随样式设置 */
@@ -15,6 +17,7 @@ body {
   background: var(--bg); color: var(--fg);
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px;
   user-select: none;
+  border-bottom: 1px solid var(--divider); /* 与内容区的分割线（box-sizing: border-box 内吸收，不占额外高度） */
 }
 #tabs {
   flex: 0 1 auto; display: flex; align-items: stretch;

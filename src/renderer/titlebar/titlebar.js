@@ -13,13 +13,22 @@ window.titlebarApi.onMaximized((isMax) => {
   btnMax.innerHTML = isMax ? '&#10064;' : '&#9634;';
 });
 
-// 标题栏字体跟随样式设置（与页面正文同一字体）
-function applyStyleFont(s) {
-  const f = (s && s.font ? String(s.font) : '').trim().replace(/["\\]/g, '');
-  document.body.style.fontFamily = f ? `"${f}", "Segoe UI", sans-serif` : '';
+// 标题栏字体跟随页面实际生效字体：主进程探测活动页的计算 font-family
+//（含 custom.css 与设置注入的效果），探测值未到时用设置页的字体字段兜底
+let pageFont = '';
+let lastStyle = null;
+function applyTitleFont() {
+  document.body.style.fontFamily = window.titleFont.titlebarFontFamily(pageFont, lastStyle && lastStyle.font);
 }
-applyStyleFont(window.titlebarApi.getStyle());
-window.titlebarApi.onStyle(applyStyleFont);
+function applyDivider() {
+  const w = lastStyle && Number.isFinite(lastStyle.dividerWidth) ? lastStyle.dividerWidth : 1;
+  document.body.style.borderBottomWidth = w + 'px'; // 0 = 隐藏分割线
+}
+function applyStyle() { applyTitleFont(); applyDivider(); }
+lastStyle = window.titlebarApi.getStyle();
+applyStyle();
+window.titlebarApi.onStyle((s) => { lastStyle = s; applyStyle(); });
+window.titlebarApi.onPageFont((f) => { pageFont = f; applyTitleFont(); });
 
 // ---------- 标签条 ----------
 const tabsEl = document.getElementById('tabs');

@@ -5,7 +5,9 @@ const DEFAULT_SETTINGS = {
   font: '',            // 空 = 使用内置 default.css 的字体栈
   lineHeight: 1.73,
   paragraphSpacing: 0, // px，块与块之间的额外上边距
-  zoom: 1,             // setZoomFactor，1 = 100%
+  zoom: 1.1,           // setZoomFactor，默认 110%
+  dividerWidth: 1.5,   // 标题栏与内容之间的分割线粗细（px），0 = 隐藏
+  align: 'justify',    // 正文对齐：justify 两端 / left / right / center
   hideHelp: false,     // 隐藏右下角帮助按钮
   hotkeys: {
     zoomIn: 'Ctrl+Shift+=',      // 页面放大 1%
@@ -24,8 +26,26 @@ function isValidHotkey(v) {
 
 function clampZoom(z) {
   const v = Math.round(Number(z) * 100) / 100;
-  if (!Number.isFinite(v)) return 1;
+  if (!Number.isFinite(v)) return 1.1;
   return Math.min(2, Math.max(0.5, v));
+}
+
+// 标题栏高度随页面缩放等比伸缩（视图 bounds 单位是 DIP，zoomFactor 会把
+// 36px 的标题栏内容渲染成 36*zoom，bounds 必须同步，否则内容被裁剪）
+function titlebarHeightForZoom(base, zoom) {
+  const z = Number(zoom);
+  if (!Number.isFinite(z) || z <= 0) return base;
+  return Math.round(base * z);
+}
+
+// 设置子窗口随页面缩放等比放大（窗口尺寸是 DIP，内容随 zoomFactor 放大，
+// 宽高不同步就会裁掉右边和底部）；maxWidth/maxHeight 为工作区上限，可选
+function settingsWindowSize(baseWidth, baseHeight, zoom, maxWidth, maxHeight) {
+  let w = titlebarHeightForZoom(baseWidth, zoom);
+  let h = titlebarHeightForZoom(baseHeight, zoom);
+  if (Number.isFinite(maxWidth) && maxWidth > 0) w = Math.min(w, maxWidth);
+  if (Number.isFinite(maxHeight) && maxHeight > 0) h = Math.min(h, maxHeight);
+  return { width: w, height: h };
 }
 
 function sanitizeSettings(raw) {
@@ -42,6 +62,10 @@ function sanitizeSettings(raw) {
       s.paragraphSpacing = Math.min(30, Math.max(0, Math.round(raw.paragraphSpacing)));
     }
     if (raw.zoom !== undefined) s.zoom = clampZoom(raw.zoom);
+    if (Number.isFinite(raw.dividerWidth)) {
+      s.dividerWidth = Math.min(4, Math.max(0, Math.round(raw.dividerWidth * 2) / 2));
+    }
+    if (['justify', 'left', 'right', 'center'].includes(raw.align)) s.align = raw.align;
     if (typeof raw.hideHelp === 'boolean') s.hideHelp = raw.hideHelp;
     if (raw.hotkeys && typeof raw.hotkeys === 'object') {
       for (const name of Object.keys(s.hotkeys)) {
@@ -79,7 +103,14 @@ function saveSettings(filePath, settings) {
 
 // 把设置编译成追加注入的 CSS（排在 default.css / custom.css 之后，优先级最高）
 function buildSettingsCss(s) {
-  let css = '';
+  // 无条件：恢复悬停 peek 触发区。custom.css 是旧版 default.css 的副本，
+  // 其顶栏块（overflow:hidden + 整区 pointer-events:none）排在 default.css 之后，
+  // 会把修复打回原型；这里最后注入兜底覆盖
+  let css = '.notion-topbar { overflow: visible !important; }\n'
+    + '.notion-open-sidebar, .notion-topbar [aria-label="Lock sidebar open"], .notion-topbar [aria-label="Open sidebar"] { pointer-events: auto !important; }\n';
+  // 文字对齐无条件下发：default.css 写死 justify，custom.css 旧副本同样带 justify，
+  // 必须靠最后注入的设置 CSS 覆盖才能切到左/右/居中
+  css += `.notion-text-block { text-align: ${s.align} !important; }\n`;
   if (s.font && s.font.trim()) {
     const f = s.font.trim().replace(/["\\]/g, '');
     css += `.notion-page-content, .notion-page-content *, .notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [data-testid="page-title"], [role="dialog"], [role="dialog"] * { font-family: "${f}", "Times New Roman", serif !important; }\n`;
@@ -99,4 +130,4 @@ function buildSettingsCss(s) {
   return css;
 }
 
-module.exports = { DEFAULT_SETTINGS, loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss };
+module.exports = { DEFAULT_SETTINGS, loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss, titlebarHeightForZoom, settingsWindowSize };

@@ -187,11 +187,21 @@ b,
 }
 
 /* ========== 顶栏一体化：隐藏 Notion 自带顶栏（功能由自定义标题栏接管） ========== */
-/* 压成 0 高但保留布局与可脚本点击：display:none 会让弹菜单锚点丢失，勿用 */
+/* 压成 0 高但保留布局与可脚本点击：display:none 会让弹菜单锚点丢失，勿用。
+   overflow 必须 visible：0 高 + hidden 会把子元素（侧栏把手）的命中区裁掉，
+   导致左缘悬停 peek 无法触发；视觉隐藏靠 opacity:0（子树整体透明） */
 .notion-topbar {
   height: 0 !important;
   min-height: 0 !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   opacity: 0 !important;
   pointer-events: none !important; /* 不挡内容区首行 hover/点击，脚本 .click() 不受影响 */
+}
+
+/* 左缘悬停 peek 触发区：透明顶栏左侧的侧栏把手恢复 hover/点击。
+   悬停它 Notion 会滑出覆盖式侧栏（不推挤内容），移入侧栏保持，移开自动收回 */
+.notion-open-sidebar,
+.notion-topbar [aria-label="Lock sidebar open"],
+.notion-topbar [aria-label="Open sidebar"] {
+  pointer-events: auto !important;
 }
