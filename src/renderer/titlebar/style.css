@@ -42,8 +42,8 @@ body {
 .tab .tab-close:hover { background: var(--hover); }
 .tab.dragging { opacity: 0.85; z-index: 10; }
 #new-tab {
-  flex: none; width: 30px; margin: 4px 2px 0; border: 0; border-radius: 6px 6px 0 0;
-  background: transparent; color: var(--fg); font-size: 17px;
+  flex: none; width: 36px; margin: 4px 2px 0; border: 0; border-radius: 6px 6px 0 0;
+  background: transparent; color: var(--fg); font-size: 16px;
   -webkit-app-region: no-drag;
 }
 #new-tab:hover { background: var(--hover); }
@@ -51,9 +51,15 @@ body {
 #drag-region {
   flex: 1; -webkit-app-region: drag;
 }
-#sidebar-toggle { flex: none; width: 38px; }
+#sidebar-toggle { flex: none; width: 36px; }
 #topbar-actions { display: flex; align-items: stretch; }
 #topbar-actions.hidden { display: none; } /* 错误页等非 Notion 页面时隐藏 */
+/* 组末竖分隔线：与窗口控制（最小化/最大化/关闭）分组，随主题变色；组隐藏时随之消失 */
+#topbar-actions::after {
+  content: ''; align-self: center;
+  width: 1px; height: 16px; margin: 0 8px;
+  background: var(--divider);
+}
 .topbar-btn {
   -webkit-app-region: no-drag;
   min-width: 36px; padding: 0 8px; border: 0; background: transparent;
@@ -70,4 +76,5 @@ body {
   font-size: 14px;
 }
 #controls button:hover { background: var(--hover); }
+#controls #max { font-size: 12px; } /* □ 字形同字号下视觉偏大，收窄与其他按钮对齐（需压过 #controls button 的特异度） */
 #close:hover { background: #e81123 !important; color: #fff; }

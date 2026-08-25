@@ -7,14 +7,20 @@ html[data-theme="dark"] {
   --input-bg: #1a1a1a; --border: rgba(255, 255, 255, 0.14); --hint: rgba(212, 212, 212, 0.5);
 }
 * { box-sizing: border-box; }
-html { margin: 0; height: 100%; overflow: hidden; background: transparent; } /* 圆角窗：透明撑底，圆角由 body 绘制 */
+html { margin: 0; height: 100%; overflow: hidden; background: transparent; } /* 圆角窗：透明撑底 */
 body {
-  display: flex; flex-direction: column;
   margin: 0; height: 100%; overflow: hidden;
-  background: var(--bg); color: var(--fg);
-  border-radius: 4px; /* 与托盘菜单同款圆角（透明窗口） */
+  /* body 背景会传播到根画布（整窗矩形）顶掉 border-radius，背景与圆角由 #win 绘制 */
+  background: transparent; color: var(--fg);
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px;
   user-select: none;
+}
+#win {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  background: var(--bg);
+  border-radius: 4px; /* 与托盘菜单同款圆角（透明窗口） */
+  overflow: hidden; /* 裁剪圆角处子元素（如关闭按钮 hover 红块） */
 }
 #titlebar {
   height: 34px; flex: none;

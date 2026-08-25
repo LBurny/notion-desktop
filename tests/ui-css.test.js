@@ -38,3 +38,36 @@ test('样式设置页字体下拉箭头字号不小于 18px', () => {
   assert.ok(m, '缺少 #font-toggle font-size');
   assert.ok(Number(m[1]) >= 18, `箭头字号 ${m[1]}px 过小`);
 });
+
+// ── 设置/样式子窗口圆角：body 背景会传播到根画布（整窗矩形），把 border-radius 顶掉。
+//    所以 body 必须透明，背景+圆角由 #win 内层容器绘制（与托盘菜单 #menu 同款结构） ──
+for (const [name, dir] of [['设置', 'app-settings'], ['样式', 'style-settings']]) {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', dir, 'style.css'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', dir, 'index.html'), 'utf8');
+  test(`${name}窗口 body 保持透明（不透明 body 背景经传播会顶掉圆角）`, () => {
+    assert.ok(/body\s*\{[^}]*background:\s*transparent/.test(css), 'body 背景必须 transparent');
+  });
+  test(`${name}窗口 #win 容器承担背景/圆角并裁剪圆角处子元素`, () => {
+    assert.ok(/#win\s*\{[^}]*background:\s*var\(--bg\)/.test(css), '#win 缺少背景');
+    assert.ok(/#win\s*\{[^}]*border-radius:\s*4px/.test(css), '#win 缺少与托盘菜单同款的 4px 圆角');
+    assert.ok(/#win\s*\{[^}]*overflow:\s*hidden/.test(css), '#win 缺少 overflow:hidden（关闭按钮 hover 红块会溢出圆角）');
+    assert.ok(/<div id="win">/.test(html), 'HTML 缺少 #win 包裹容器');
+  });
+}
+
+// ── 标题栏排版一致性：按钮族同宽、顶栏动作与窗口控制之间有主题色分隔线 ──
+test('标题栏侧栏开关与新建标签按钮同宽 36px（按钮族一致）', () => {
+  assert.ok(/#sidebar-toggle\s*\{[^}]*width:\s*36px/.test(TITLEBAR_CSS), '#sidebar-toggle 应为 36px');
+  assert.ok(/#new-tab\s*\{[^}]*width:\s*36px/.test(TITLEBAR_CSS), '#new-tab 应为 36px');
+});
+
+test('标题栏顶栏动作组末尾带竖分隔线（与窗口控制分组，随主题变色）', () => {
+  assert.ok(/#topbar-actions::after\s*\{[^}]*width:\s*1px/.test(TITLEBAR_CSS), '缺少 #topbar-actions::after 分隔线');
+  assert.ok(/#topbar-actions::after\s*\{[^}]*var\(--divider\)/.test(TITLEBAR_CSS), '分隔线应使用 --divider 随主题变色');
+});
+
+test('最大化按钮字形字号收窄（□ 字形同字号下视觉偏大）', () => {
+  const m = TITLEBAR_CSS.match(/#max\s*\{[^}]*font-size:\s*(\d+)px/);
+  assert.ok(m, '缺少 #max font-size');
+  assert.ok(Number(m[1]) <= 12, `#max 字号 ${m[1]}px 应 ≤12px`);
+});

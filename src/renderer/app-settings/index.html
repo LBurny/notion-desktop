@@ -7,37 +7,40 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="titlebar">
-    <span>设置</span>
-    <button id="close" title="关闭">&#10005;</button>
-  </div>
-  <div id="form">
-    <div class="section first">快捷键</div>
-    <label class="row">
-      <span class="name">放大页面</span>
-      <input id="hk-zoomIn" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
-    </label>
-    <label class="row">
-      <span class="name">缩小页面</span>
-      <input id="hk-zoomOut" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
-    </label>
-    <label class="row">
-      <span class="name">显示 / 隐藏</span>
-      <input id="hk-toggleWindow" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
-    </label>
-    <div class="section">斜杠命令快捷键</div>
-    <div id="slash-list"></div>
-    <div class="row"><button id="slash-add" type="button">+ 添加</button></div>
-    <div class="section">关闭窗口时</div>
-    <label class="row check">
-      <input id="close-tray" type="radio" name="closeAction" value="tray" />
-      <span>最小化到托盘</span>
-    </label>
-    <label class="row check">
-      <input id="close-quit" type="radio" name="closeAction" value="quit" />
-      <span>退出程序</span>
-    </label>
-    <p id="hint"></p>
+  <!-- #win：圆角/背景由它绘制（body 背景会传播到根画布顶掉圆角，参考托盘菜单 #menu 结构） -->
+  <div id="win">
+    <div id="titlebar">
+      <span>设置</span>
+      <button id="close" title="关闭">&#10005;</button>
+    </div>
+    <div id="form">
+      <div class="section first">快捷键</div>
+      <label class="row">
+        <span class="name">放大页面</span>
+        <input id="hk-zoomIn" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+      </label>
+      <label class="row">
+        <span class="name">缩小页面</span>
+        <input id="hk-zoomOut" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+      </label>
+      <label class="row">
+        <span class="name">显示 / 隐藏</span>
+        <input id="hk-toggleWindow" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+      </label>
+      <div class="section">斜杠命令快捷键</div>
+      <div id="slash-list"></div>
+      <div class="row"><button id="slash-add" type="button">+ 添加</button></div>
+      <div class="section">关闭窗口时</div>
+      <label class="row check">
+        <input id="close-tray" type="radio" name="closeAction" value="tray" />
+        <span>最小化到托盘</span>
+      </label>
+      <label class="row check">
+        <input id="close-quit" type="radio" name="closeAction" value="quit" />
+        <span>退出程序</span>
+      </label>
+      <p id="hint"></p>
+    </div>
   </div>
   <script src="hotkey-capture.js"></script>
   <script src="settings.js"></script>
