@@ -25,7 +25,8 @@ test('loadSettings JSON 损坏时返回默认值', () => {
 test('saveSettings + loadSettings 往返一致', () => {
   const f = tmpFile('s.json');
   const s = {
-    font: '思源宋体 CN', lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.05, hideHelp: true,
+    fonts: { body: '思源宋体 CN', ui: '', code: 'JetBrains Mono', math: '' },
+    lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.05, hideHelp: true,
     dividerWidth: 2.5, align: 'center',
     hotkeys: { zoomIn: 'Ctrl+Alt+Q', zoomOut: 'Ctrl+Alt+W', toggleWindow: 'Ctrl+Alt+E' },
     closeAction: 'quit',
@@ -37,9 +38,10 @@ test('saveSettings + loadSettings 往返一致', () => {
 
 test('sanitizeSettings 钳位非法值', () => {
   const s = sanitizeSettings({
-    font: 42, lineHeight: 5, paragraphSpacing: -3, zoom: 9, hideHelp: 'yes',
+    fonts: { body: 42, ui: 'X' }, lineHeight: 5, paragraphSpacing: -3, zoom: 9, hideHelp: 'yes',
   });
-  assert.strictEqual(s.font, '');
+  assert.strictEqual(s.fonts.body, '');
+  assert.strictEqual(s.fonts.ui, 'X');
   assert.strictEqual(s.lineHeight, 3);
   assert.strictEqual(s.paragraphSpacing, 0);
   assert.strictEqual(s.zoom, 2);
@@ -66,11 +68,19 @@ test('buildSettingsCss 默认设置下发默认字体栈（雅黑兜底）+ 行�
   assert.ok(css.includes('"思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif'));
   assert.ok(!css.includes('margin-top'));
   assert.ok(!css.includes('notion-help-button'));
+  // 默认零变化：正文/界面选择器分组覆盖旧 FONT_SELECTORS 全集，且不下发代码/公式规则
+  assert.ok(css.includes('.notion-page-content'));
+  assert.ok(css.includes('.notion-sidebar'));
+  assert.ok(css.includes('[role="dialog"]'));
+  assert.ok(css.includes('[data-testid="page-title"]'));
+  assert.ok(!css.includes('.notion-code-block'), '默认不下发代码兜底（交给 default.css）');
+  assert.ok(!css.includes('katex'), '默认不下发公式规则（交给 default.css）');
 });
 
 test('buildSettingsCss 全量设置生成对应规则', () => {
   const css = buildSettingsCss({
-    font: '思源宋体 CN', lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.1, hideHelp: true,
+    fonts: { body: '思源宋体 CN', ui: '', code: '', math: '' },
+    lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.1, hideHelp: true,
   });
   assert.ok(css.includes('font-family: "思源宋体 CN"'));
   // 自定义字体的 CJK 回退也垫微软雅黑（拉丁-only 字体的中文不至于落到宋体）
@@ -85,7 +95,7 @@ test('buildSettingsCss 全量设置生成对应规则', () => {
 });
 
 test('buildSettingsCss 字体名过滤引号与反斜杠', () => {
-  const css = buildSettingsCss({ ...DEFAULT_SETTINGS, font: 'Evil"; \\' });
+  const css = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Evil"; \\', ui: '', code: '', math: '' } });
   assert.ok(!css.includes('Evil"'));
   assert.ok(!css.includes('\\'));
 });
@@ -140,7 +150,7 @@ test('loadSettings 旧版文件（无快捷键字段）补齐默认值', () => {
   const s = loadSettings(f);
   assert.deepStrictEqual(s.hotkeys, DEFAULT_SETTINGS.hotkeys);
   assert.strictEqual(s.closeAction, 'tray');
-  assert.strictEqual(s.font, 'Test');
+  assert.strictEqual(s.fonts.body, 'Test');
 });
 
 test('slashCommands 默认预置 math', () => {
@@ -201,4 +211,51 @@ test('buildSettingsCss 无条件附带悬停 peek 触发区规则（压过旧版
   assert.ok(css.includes('overflow: visible'), '需覆盖旧副本的 overflow:hidden');
   assert.ok(css.includes('.notion-open-sidebar'), '需恢复侧栏把手 pointer-events');
   assert.ok(css.includes('pointer-events: auto'));
+});
+
+// ── 分区字体（fonts.{body,ui,code,math}） ──
+
+test('sanitizeSettings 旧版顶层 font 迁移进 fonts.body（新字段优先）', () => {
+  assert.strictEqual(sanitizeSettings({ font: 'X' }).fonts.body, 'X');
+  assert.strictEqual(sanitizeSettings({ font: 'X', fonts: { body: 'Y' } }).fonts.body, 'Y');
+  assert.deepStrictEqual(sanitizeSettings(null).fonts, { body: '', ui: '', code: '', math: '' });
+});
+
+test('sanitizeSettings fonts 返回值不共享 DEFAULT_SETTINGS 引用', () => {
+  const s = sanitizeSettings(null);
+  s.fonts.body = 'X';
+  assert.strictEqual(DEFAULT_SETTINGS.fonts.body, '');
+});
+
+test('buildSettingsCss 界面槽留空跟随正文，填入后独立', () => {
+  const follow = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
+  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "Aa", "Times New Roman", "Microsoft YaHei", serif/.test(follow), 'ui 留空应跟随 body');
+  const own = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: 'Bb', code: '', math: '' } });
+  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "Bb"/.test(own), 'ui 填入后独立');
+  assert.ok(/\.notion-page-content[^{]*\{[^}]*font-family: "Aa"/.test(own), 'body 不受影响');
+});
+
+test('buildSettingsCss 代码槽：body 自定义时兜底等宽，code 自定义时换成用户字体', () => {
+  const fallback = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
+  assert.ok(/\.notion-code-block[^{]*\{[^}]*font-family: "Consolas"/.test(fallback), 'body 自定义时代码块重新兜底等宽（回归旧行为）');
+  const custom = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: '', ui: '', code: 'JetBrains Mono', math: '' } });
+  assert.ok(/\.notion-code-block[^{]*\{[^}]*font-family: "JetBrains Mono", "Consolas"/.test(custom));
+  assert.ok(custom.includes('[role="dialog"] .notion-code-block'), '浮层预览里的代码块一并覆盖');
+});
+
+test('buildSettingsCss 公式槽：默认不下发，自定义时内联+展示+浮层全覆盖并垫 KaTeX_Main', () => {
+  const custom = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: '', ui: '', code: '', math: 'Cambria Math' } });
+  assert.ok(custom.includes('"Cambria Math", "KaTeX_Main", "Times New Roman", serif'));
+  // 内联规则必须复用 default.css 同特异性的 :not 选择器（同特异性后注入者赢）
+  assert.ok(custom.includes('.notion-text-block .katex:not(.katex-display .katex)'));
+  assert.ok(custom.includes('.katex-display .katex'), '展示公式一并覆盖');
+  assert.ok(custom.includes('[role="dialog"] .katex'), '浮层预览里的公式一并覆盖');
+});
+
+test('buildSettingsCss 公式字体名同样过滤引号与反斜杠', () => {
+  const css = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: '', ui: '', code: '', math: 'Evil"; \\' } });
+  // 注入的引号/反斜杠被剥掉，字体名被干净地包进回退链
+  assert.ok(css.includes('"Evil; ", "KaTeX_Main", "Times New Roman", serif'));
+  assert.ok(!css.includes('Evil"'));
+  assert.ok(!css.includes('\\'));
 });

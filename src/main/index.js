@@ -210,7 +210,7 @@ app.whenReady().then(() => {
   settingsWindows = createSettingsWindows({
     baseWidth: 340,
     configs: {
-      style: { height: 380, dir: 'style-settings' },
+      style: { height: 500, dir: 'style-settings' },
       app: { height: 440, dir: 'app-settings' },
     },
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),

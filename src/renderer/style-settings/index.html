@@ -15,11 +15,35 @@
     </div>
     <div id="form">
       <label class="row">
-        <span class="name">字体</span>
-        <div id="font-combo">
-          <input id="font" type="text" placeholder="默认：思源宋体 CN" autocomplete="off" spellcheck="false" />
-          <button id="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
-          <ul id="font-options" hidden></ul>
+        <span class="name">正文字体</span>
+        <div class="font-combo">
+          <input id="font-body" type="text" placeholder="默认：思源宋体 CN" autocomplete="off" spellcheck="false" />
+          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <ul class="font-options" hidden></ul>
+        </div>
+      </label>
+      <label class="row">
+        <span class="name">界面字体</span>
+        <div class="font-combo">
+          <input id="font-ui" type="text" placeholder="默认：跟随正文" autocomplete="off" spellcheck="false" />
+          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <ul class="font-options" hidden></ul>
+        </div>
+      </label>
+      <label class="row">
+        <span class="name">代码字体</span>
+        <div class="font-combo">
+          <input id="font-code" type="text" placeholder="默认：Consolas" autocomplete="off" spellcheck="false" />
+          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <ul class="font-options" hidden></ul>
+        </div>
+      </label>
+      <label class="row">
+        <span class="name">公式字体</span>
+        <div class="font-combo">
+          <input id="font-math" type="text" placeholder="默认：KaTeX_Main" autocomplete="off" spellcheck="false" />
+          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <ul class="font-options" hidden></ul>
         </div>
       </label>
       <label class="row">

@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_SETTINGS = {
-  font: '',            // 空 = 使用内置 default.css 的字体栈
+  fonts: { body: '', ui: '', code: '', math: '' }, // 分区字体：空 = 各槽内置默认（ui 空 = 跟随 body）
   lineHeight: 1.73,
   paragraphSpacing: 0, // px，块与块之间的额外上边距
   zoom: 1,             // setZoomFactor，默认 100%
@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = {
 };
 
 const HOTKEY_RE = /^(Ctrl|Alt|Shift)(\+(Ctrl|Alt|Shift))*\+[^+]+$/;
+
+const FONT_SLOTS = ['body', 'ui', 'code', 'math'];
 
 function isValidHotkey(v) {
   return typeof v === 'string' && v.length <= 40 && HOTKEY_RE.test(v);
@@ -49,14 +51,21 @@ function settingsWindowSize(baseWidth, baseHeight, zoom, maxWidth, maxHeight) {
 }
 
 function sanitizeSettings(raw) {
-  // hotkeys / slashCommands 需深拷贝，避免合并用户值时改动 DEFAULT_SETTINGS
+  // fonts / hotkeys / slashCommands 需深拷贝，避免合并用户值时改动 DEFAULT_SETTINGS
   const s = {
     ...DEFAULT_SETTINGS,
+    fonts: { ...DEFAULT_SETTINGS.fonts },
     hotkeys: { ...DEFAULT_SETTINGS.hotkeys },
     slashCommands: DEFAULT_SETTINGS.slashCommands.map((c) => ({ ...c })),
   };
   if (raw && typeof raw === 'object') {
-    if (typeof raw.font === 'string') s.font = raw.font.slice(0, 100);
+    if (raw.fonts && typeof raw.fonts === 'object') {
+      for (const k of FONT_SLOTS) {
+        if (typeof raw.fonts[k] === 'string') s.fonts[k] = raw.fonts[k].slice(0, 100);
+      }
+    }
+    // 旧版迁移：顶层 font → fonts.body（新字段非空时优先）
+    if (!s.fonts.body && typeof raw.font === 'string') s.fonts.body = raw.font.slice(0, 100);
     if (Number.isFinite(raw.lineHeight)) s.lineHeight = Math.min(3, Math.max(1, raw.lineHeight));
     if (Number.isFinite(raw.paragraphSpacing)) {
       s.paragraphSpacing = Math.min(30, Math.max(0, Math.round(raw.paragraphSpacing)));
@@ -105,7 +114,29 @@ function saveSettings(filePath, settings) {
 // 防未装思源宋体的机器落到 system serif=宋体）。无条件下发：custom.css 是旧版
 // default.css 的副本，其字体规则排在 default.css 之后会盖住新栈，靠最后注入兜底
 const DEFAULT_FONT_STACK = '"思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif';
-const FONT_SELECTORS = '.notion-page-content, .notion-page-content *, .notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [data-testid="page-title"], [role="dialog"], [role="dialog"] *';
+const CODE_FONT_STACK = '"Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace';
+const MATH_FONT_STACK = '"KaTeX_Main", "Times New Roman", serif';
+
+// 正文/界面选择器分组：两组合计与旧版统一 FONT_SELECTORS 完全同集（默认外观零变化）；
+// 页面大标题是内容的组成部分归正文；Quick Find 等浮层归界面（与现状一致）
+const BODY_SELECTORS = '.notion-page-content, .notion-page-content *, [data-testid="page-title"]';
+const UI_SELECTORS = '.notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [role="dialog"], [role="dialog"] *';
+const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *';
+// 公式内联规则必须复用 default.css 同特异性 (0,4,0) 的 :not 选择器（同特异性后注入者赢）；
+// 展示公式与浮层预览无竞争，直接覆盖
+const MATH_SELECTORS = '.notion-text-block .katex:not(.katex-display .katex), .notion-text-block .katex:not(.katex-display .katex) *, .katex-display .katex, .katex-display .katex *, [role="dialog"] .katex, [role="dialog"] .katex *';
+
+// 自定义字体名过滤引号/反斜杠（防 CSS 注入）
+function cleanFontName(name) {
+  if (typeof name !== 'string') return '';
+  return name.trim().replace(/["\\]/g, '');
+}
+
+// 自定义字体 + 回退链；空/非法返回 null（调用方回退默认栈）
+function customFontChain(name, fallbacks) {
+  const f = cleanFontName(name);
+  return f ? `"${f}", ${fallbacks}` : null;
+}
 
 // 把设置编译成追加注入的 CSS（排在 default.css / custom.css 之后，优先级最高）
 function buildSettingsCss(s) {
@@ -117,13 +148,23 @@ function buildSettingsCss(s) {
   // 文字对齐无条件下发：default.css 写死 justify，custom.css 旧副本同样带 justify，
   // 必须靠最后注入的设置 CSS 覆盖才能切到左/右/居中
   css += `.notion-text-block { text-align: ${s.align} !important; }\n`;
-  // 字体无条件下发（同上兜底理由）；自定义字体时换成用户选择，回退链同样垫雅黑
-  if (s.font && s.font.trim()) {
-    const f = s.font.trim().replace(/["\\]/g, '');
-    css += `${FONT_SELECTORS} { font-family: "${f}", "Times New Roman", "Microsoft YaHei", serif !important; }\n`;
-    css += '.notion-code-block, .notion-code-block * { font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important; }\n';
-  } else {
-    css += `${FONT_SELECTORS} { font-family: ${DEFAULT_FONT_STACK} !important; }\n`;
+  // 分区字体无条件下发（兜底覆盖 custom.css 旧副本，同对齐规则的理由）；
+  // 各槽空 = 内置默认栈，ui 空 = 跟随 body，自定义回退链统一垫雅黑防拉丁-only 字体的中文落宋体
+  const bodyChain = customFontChain(s.fonts.body, '"Times New Roman", "Microsoft YaHei", serif') || DEFAULT_FONT_STACK;
+  css += `${BODY_SELECTORS} { font-family: ${bodyChain} !important; }\n`;
+  const uiChain = customFontChain(s.fonts.ui, '"Times New Roman", "Microsoft YaHei", serif') || bodyChain;
+  css += `${UI_SELECTORS} { font-family: ${uiChain} !important; }\n`;
+  // 代码块：正文/界面自定义时 .notion-page-content * 等同特异性规则会盖过 default.css
+  // 的等宽规则，必须重新兜底；code 槽自定义时换成用户字体
+  const codeChain = customFontChain(s.fonts.code, CODE_FONT_STACK);
+  if (codeChain || cleanFontName(s.fonts.body) || cleanFontName(s.fonts.ui)) {
+    css += `${CODE_SELECTORS} { font-family: ${codeChain || CODE_FONT_STACK} !important; }\n`;
+  }
+  // 公式：默认完全交给 default.css（内联 KaTeX_Main / 浮层 Consolas，维持现状），
+  // math 槽自定义时才下发（垫 KaTeX_Main 防缺字形出方框）
+  const mathChain = customFontChain(s.fonts.math, MATH_FONT_STACK);
+  if (mathChain) {
+    css += `${MATH_SELECTORS} { font-family: ${mathChain} !important; }\n`;
   }
   if (Number.isFinite(s.lineHeight) && s.lineHeight > 0) {
     css += '.notion-text-block, .notion-bulleted_list-block, .notion-numbered_list-block, .notion-to_do-block, .notion-quote-block, .notion-callout-block, .notion-toggle-block, .notion-header-block, .notion-sub_header-block, .notion-sub_sub_header-block, [data-testid="page-title"]'

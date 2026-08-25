@@ -46,31 +46,31 @@ input[type="text"], input[type="number"] {
 }
 input[type="text"]:focus, input[type="number"]:focus { border-color: #2383e2; }
 
-/* 字体下拉：自绘组件（原生 datalist 弹层不跟主题、小窗内无法滚动） */
-#font-combo { position: relative; flex: 1; min-width: 0; display: flex; }
-#font-combo input { border-radius: 4px 0 0 4px; border-right: 0; }
-#font-toggle {
+/* 字体下拉：自绘组件（原生 datalist 弹层不跟主题、小窗内无法滚动）；四个字体槽位共用 */
+.font-combo { position: relative; flex: 1; min-width: 0; display: flex; }
+.font-combo input { border-radius: 4px 0 0 4px; border-right: 0; }
+.font-toggle {
   width: 34px; height: 28px; flex: none;
   border: 1px solid var(--border); border-radius: 0 4px 4px 0;
   background: var(--input-bg); color: var(--hint); font-size: 19px;
   line-height: 1; padding: 0 0 3px;
 }
-#font-toggle:hover { background: var(--hover); color: var(--fg); }
-#font-options {
+.font-toggle:hover { background: var(--hover); color: var(--fg); }
+.font-options {
   position: absolute; top: 30px; left: 0; right: 0; z-index: 10;
   max-height: 168px; overflow-y: auto;
   margin: 0; padding: 4px; list-style: none;
   background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
 }
-#font-options li {
+.font-options li {
   padding: 5px 8px; border-radius: 4px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-#font-options li:hover, #font-options li.active { background: var(--hover); }
-#font-options li.empty { color: var(--hint); }
-#font-options::-webkit-scrollbar { width: 8px; }
-#font-options::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.font-options li:hover, .font-options li.active { background: var(--hover); }
+.font-options li.empty { color: var(--hint); }
+.font-options::-webkit-scrollbar { width: 8px; }
+.font-options::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 #zoom-group { display: flex; align-items: center; gap: 8px; }
 #zoom-group button {
   width: 28px; height: 28px;

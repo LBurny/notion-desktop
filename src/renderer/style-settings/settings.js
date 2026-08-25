@@ -4,10 +4,12 @@ let settings = window.settingsApi.get();
 
 // 字体下拉：自绘可滚动列表（原生 datalist 弹层不跟主题、小窗内无法滚动）
 // 只列出系统真实安装的候选字体，每项直接用该字体渲染预览；仍可手动输入任意字体名
-(function setupFontCombo() {
-  const input = $('font');
-  const toggle = $('font-toggle');
-  const listEl = $('font-options');
+// 四个字体槽位（正文/界面/代码/公式）各实例化一个，onChange 接收新值
+function setupFontCombo(inputId, onChange) {
+  const input = $(inputId);
+  const combo = input.parentElement;
+  const toggle = combo.querySelector('.font-toggle');
+  const listEl = combo.querySelector('.font-options');
   const { CANDIDATE_FONTS, filterAvailableFonts, isFontAvailable } = window.fontDetect;
   // 优先列出系统全部已安装字体（注册表枚举，与 Word 同源）；
   // 枚举失败（如非 Windows）时退回候选名单 + canvas 探测
@@ -41,8 +43,7 @@ let settings = window.settingsApi.get();
       li.addEventListener('mousedown', (e) => {
         e.preventDefault();
         input.value = name;
-        settings.font = name;
-        push();
+        onChange(input.value);
         close();
       });
       listEl.appendChild(li);
@@ -63,7 +64,7 @@ let settings = window.settingsApi.get();
     input.focus();
   });
   input.addEventListener('focus', open);
-  input.addEventListener('input', () => { render(input.value); listEl.hidden = false; });
+  input.addEventListener('input', () => { onChange(input.value); render(input.value); listEl.hidden = false; });
   input.addEventListener('blur', close);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
@@ -74,8 +75,7 @@ let settings = window.settingsApi.get();
       const items = listEl.querySelectorAll('li:not(.empty)');
       if (activeIdx >= 0 && items[activeIdx]) {
         input.value = items[activeIdx].textContent;
-        settings.font = input.value;
-        push();
+        onChange(input.value);
       }
       close();
     } else if (e.key === 'Escape' && isOpen()) {
@@ -84,12 +84,18 @@ let settings = window.settingsApi.get();
     }
   });
   document.addEventListener('mousedown', (e) => {
-    if (isOpen() && !$('font-combo').contains(e.target)) close();
+    if (isOpen() && !combo.contains(e.target)) close();
   });
-})();
+}
+
+for (const slot of ['body', 'ui', 'code', 'math']) {
+  setupFontCombo(`font-${slot}`, (v) => { settings.fonts[slot] = v; push(); });
+}
 
 function render() {
-  $('font').value = settings.font;
+  for (const slot of ['body', 'ui', 'code', 'math']) {
+    $(`font-${slot}`).value = settings.fonts[slot];
+  }
   $('lineHeight').value = settings.lineHeight;
   $('paragraphSpacing').value = settings.paragraphSpacing;
   $('dividerWidth').value = settings.dividerWidth;
@@ -120,7 +126,6 @@ async function commit() {
   } catch { /* 保存失败则不提示 */ }
 }
 
-$('font').addEventListener('input', (e) => { settings.font = e.target.value; push(); });
 $('lineHeight').addEventListener('input', (e) => {
   const v = Number(e.target.value);
   if (Number.isFinite(v)) { settings.lineHeight = v; push(); }

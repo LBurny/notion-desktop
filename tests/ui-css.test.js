@@ -34,8 +34,8 @@ test('标题栏样式表定义明暗两套 --divider 并用于底部分割线', 
 // ── 字体下拉箭头要足够大（用户反馈 11px/15px 均嫌小） ──
 const STYLE_SETTINGS_CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'style-settings', 'style.css'), 'utf8');
 test('样式设置页字体下拉箭头字号不小于 18px', () => {
-  const m = STYLE_SETTINGS_CSS.match(/#font-toggle\s*\{[^}]*font-size:\s*(\d+)px/);
-  assert.ok(m, '缺少 #font-toggle font-size');
+  const m = STYLE_SETTINGS_CSS.match(/\.font-toggle\s*\{[^}]*font-size:\s*(\d+)px/);
+  assert.ok(m, '缺少 .font-toggle font-size');
   assert.ok(Number(m[1]) >= 18, `箭头字号 ${m[1]}px 过小`);
 });
 
