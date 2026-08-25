@@ -48,7 +48,9 @@ scripts/        CDP 调试/端到端/截图脚本
 - 推送用每命令级 Basic 头，token 只在 `$GH_TOKEN` 环境变量，**绝不写进 git 配置/远程 URL/文件**：
   `B64=$(echo -n "x-access-token:$GH_TOKEN" | base64 -w0); git -c http.extraheader="Authorization: Basic $B64" push origin main`
 - 推送后必须 `ls-remote` 验证（拦截连接会谎报 "Everything up-to-date"）。
-- **发布流程**：package.json 升版本 → `npm run dist` → 写 `docs/releases/vX.Y.Z.zh-CN.md`（中文说明）→ commit + tag + push → API 建 release（正文英文，顶部 `English | [中文说明](...docs/releases/vX.Y.Z.zh-CN.md)` 链接）→ 上传 `dist/Notion Desktop Setup X.Y.Z.exe` 为 `Notion.Desktop.Setup.X.Y.Z.exe`。
+- **发布流程**：package.json 升版本 → `npm run dist` → 写 `docs/releases/vX.Y.Z.zh-CN.md`（中文说明）→ commit + tag + push → API 建 release → 上传 `dist/Notion Desktop Setup X.Y.Z.exe` → 清理临时文件（如 release-body.json）。
+- **发行版命名规范**：release 标题用 `Notion Desktop vX.Y.Z`（带产品名，不是裸 `vX.Y.Z`）；附件名 `Notion.Desktop.Setup.X.Y.Z.exe`（点分、无空格、不带 v）。
+- **release 说明中英文结构**：正文仅英文，首行 `English | [中文说明](https://github.com/LBurny/notion-desktop/blob/main/docs/releases/vX.Y.Z.zh-CN.md)`；中文全文放 docs/releases/vX.Y.Z.zh-CN.md（对应文件首行反向链接 release 页）。不要把中文段落直接塞进 release 正文。
 
 ## 文档
 
