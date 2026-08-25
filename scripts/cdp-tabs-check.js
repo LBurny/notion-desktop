@@ -28,9 +28,10 @@ function sendKeys(seq) {
   execFileSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'pipe' });
 }
 
-async function targets() {
-  const res = await fetch(`http://127.0.0.1:${port}/json`);
-  return res.json();
+function targets() {
+  // Node fetch/http 会卡死 Electron devtools HTTP 服务（AGENTS.md），一律 curl
+  const out = execFileSync('curl', ['-s', '-m', '8', `http://127.0.0.1:${port}/json`]).toString();
+  return Promise.resolve(JSON.parse(out));
 }
 
 function attach(wsUrl) {

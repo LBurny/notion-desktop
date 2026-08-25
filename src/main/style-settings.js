@@ -5,7 +5,7 @@ const DEFAULT_SETTINGS = {
   font: '',            // 空 = 使用内置 default.css 的字体栈
   lineHeight: 1.73,
   paragraphSpacing: 0, // px，块与块之间的额外上边距
-  zoom: 1.1,           // setZoomFactor，默认 110%
+  zoom: 1,             // setZoomFactor，默认 100%
   dividerWidth: 1.5,   // 标题栏与内容之间的分割线粗细（px），0 = 隐藏
   align: 'justify',    // 正文对齐：justify 两端 / left / right / center
   hideHelp: false,     // 隐藏右下角帮助按钮
@@ -26,7 +26,7 @@ function isValidHotkey(v) {
 
 function clampZoom(z) {
   const v = Math.round(Number(z) * 100) / 100;
-  if (!Number.isFinite(v)) return 1.1;
+  if (!Number.isFinite(v)) return 1;
   return Math.min(2, Math.max(0.5, v));
 }
 
@@ -101,6 +101,12 @@ function saveSettings(filePath, settings) {
   fs.writeFileSync(filePath, JSON.stringify(sanitizeSettings(settings), null, 2));
 }
 
+// 默认字体栈：思源宋体（装了就用）→ Times New Roman（拉丁）→ 微软雅黑（CJK 兜底，
+// 防未装思源宋体的机器落到 system serif=宋体）。无条件下发：custom.css 是旧版
+// default.css 的副本，其字体规则排在 default.css 之后会盖住新栈，靠最后注入兜底
+const DEFAULT_FONT_STACK = '"思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif';
+const FONT_SELECTORS = '.notion-page-content, .notion-page-content *, .notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [data-testid="page-title"], [role="dialog"], [role="dialog"] *';
+
 // 把设置编译成追加注入的 CSS（排在 default.css / custom.css 之后，优先级最高）
 function buildSettingsCss(s) {
   // 无条件：恢复悬停 peek 触发区。custom.css 是旧版 default.css 的副本，
@@ -111,10 +117,13 @@ function buildSettingsCss(s) {
   // 文字对齐无条件下发：default.css 写死 justify，custom.css 旧副本同样带 justify，
   // 必须靠最后注入的设置 CSS 覆盖才能切到左/右/居中
   css += `.notion-text-block { text-align: ${s.align} !important; }\n`;
+  // 字体无条件下发（同上兜底理由）；自定义字体时换成用户选择，回退链同样垫雅黑
   if (s.font && s.font.trim()) {
     const f = s.font.trim().replace(/["\\]/g, '');
-    css += `.notion-page-content, .notion-page-content *, .notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [data-testid="page-title"], [role="dialog"], [role="dialog"] * { font-family: "${f}", "Times New Roman", serif !important; }\n`;
+    css += `${FONT_SELECTORS} { font-family: "${f}", "Times New Roman", "Microsoft YaHei", serif !important; }\n`;
     css += '.notion-code-block, .notion-code-block * { font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important; }\n';
+  } else {
+    css += `${FONT_SELECTORS} { font-family: ${DEFAULT_FONT_STACK} !important; }\n`;
   }
   if (Number.isFinite(s.lineHeight) && s.lineHeight > 0) {
     css += '.notion-text-block, .notion-bulleted_list-block, .notion-numbered_list-block, .notion-to_do-block, .notion-quote-block, .notion-callout-block, .notion-toggle-block, .notion-header-block, .notion-sub_header-block, .notion-sub_sub_header-block, [data-testid="page-title"]'

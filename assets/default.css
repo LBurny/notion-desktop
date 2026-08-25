@@ -3,7 +3,7 @@
   text-align: justify;
 }
 
-/* ========== 全局字体：思源宋体 CN + Times New Roman ========== */
+/* ========== 全局字体：思源宋体 CN + Times New Roman（雅黑兜底：未装思源宋体时 CJK 不落宋体） ========== */
 [data-testid="page-title"],
 .notion-page-block .notion-page-block,
 .notion-page-block .notion-selectable,
@@ -51,7 +51,7 @@ h1 *,
 .notion-topbar *,
 .notion-breadcrumb,
 .notion-breadcrumb * {
-  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", serif !important;
+  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif !important;
 }
 
 /* ========== 代码块 Consolas 字体 ========== */
@@ -89,7 +89,7 @@ input[type="text"] *,
 .notion-quick-find *,
 .notion-search,
 .notion-search * {
-  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", serif !important;
+  font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif !important;
 }
 [role="dialog"] .notion-code-block,
 [role="dialog"] .notion-code-block *,

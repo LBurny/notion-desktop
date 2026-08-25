@@ -50,19 +50,20 @@ test('clampZoom 步进 1% 且限制在 50%~200%', () => {
   assert.strictEqual(clampZoom(1.234), 1.23);
   assert.strictEqual(clampZoom(0.01), 0.5);
   assert.strictEqual(clampZoom(99), 2);
-  assert.strictEqual(clampZoom('abc'), 1.1);
+  assert.strictEqual(clampZoom('abc'), 1);
 });
 
-test('默认页面缩放为 110%', () => {
-  assert.strictEqual(DEFAULT_SETTINGS.zoom, 1.1);
-  assert.strictEqual(sanitizeSettings(null).zoom, 1.1);
-  assert.strictEqual(sanitizeSettings({ zoom: 'x' }).zoom, 1.1);
+test('默认页面缩放为 100%', () => {
+  assert.strictEqual(DEFAULT_SETTINGS.zoom, 1);
+  assert.strictEqual(sanitizeSettings(null).zoom, 1);
+  assert.strictEqual(sanitizeSettings({ zoom: 'x' }).zoom, 1);
 });
 
-test('buildSettingsCss 默认设置只含行距规则', () => {
+test('buildSettingsCss 默认设置下发默认字体栈（雅黑兜底）+ 行距规则', () => {
   const css = buildSettingsCss(DEFAULT_SETTINGS);
   assert.ok(css.includes('line-height: 1.73'));
-  assert.ok(!css.includes('font-family'));
+  // 默认栈无条件下发（兜底覆盖 custom.css 旧副本）：思源宋体 → Times → 微软雅黑 → serif
+  assert.ok(css.includes('"思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif'));
   assert.ok(!css.includes('margin-top'));
   assert.ok(!css.includes('notion-help-button'));
 });
@@ -72,6 +73,8 @@ test('buildSettingsCss 全量设置生成对应规则', () => {
     font: '思源宋体 CN', lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.1, hideHelp: true,
   });
   assert.ok(css.includes('font-family: "思源宋体 CN"'));
+  // 自定义字体的 CJK 回退也垫微软雅黑（拉丁-only 字体的中文不至于落到宋体）
+  assert.ok(css.includes('"思源宋体 CN", "Times New Roman", "Microsoft YaHei", serif'));
   assert.ok(css.includes('line-height: 1.8'));
   assert.ok(css.includes('margin-top: 6px'));
   assert.ok(css.includes('.notion-help-button'));

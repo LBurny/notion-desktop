@@ -1,7 +1,7 @@
 // V8 编译缓存：加速冷启动的模块编译（Node 22.1+；旧运行时静默跳过）
 try { require('node:module').enableCompileCache(); } catch { /* 无此 API 时忽略 */ }
 const path = require('path');
-const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, screen, nativeTheme, Tray, Menu, globalShortcut } = require('electron');
+const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, screen, nativeTheme, Tray, Menu, globalShortcut, session } = require('electron');
 const { createPerf } = require('./perf');
 const { loadState, isVisibleOnSomeDisplay, trackWindow } = require('./window-state');
 const { ensureCustomCss, createCssProvider, watchCustomCss } = require('./css-manager');
@@ -16,6 +16,7 @@ const { listSystemFonts } = require('./system-fonts');
 const { createTabManager, saveTabsFile } = require('./tab-manager');
 const { createTabs } = require('./tabs');
 const { createSettingsWindows } = require('./settings-windows');
+const { attachRequestFilter } = require('./request-filter');
 
 const NOTION_URL = 'https://www.notion.so/';
 const TITLEBAR_HEIGHT = 36;
@@ -236,6 +237,9 @@ app.whenReady().then(() => {
 
   customCssPath = ensureCustomCss(app.getPath('userData'), DEFAULT_CSS);
   cssProvider = createCssProvider(DEFAULT_CSS, customCssPath);
+
+  // 遥测/广告域名拦截：必须早于任何标签 loadURL（restore/newTab 在 createTabs 之后）
+  attachRequestFilter(session.fromPartition('persist:notion'));
 
   // 标签状态变化 → 推送标题栏渲染 + 防抖持久化
   let saveTimer = null;

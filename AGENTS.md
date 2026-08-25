@@ -28,6 +28,7 @@ src/main/       主进程：index.js 只剩装配；结构归口到独立模块�
                 theme-service.js 主题归口（宽限期/落盘/广播）；settings-windows.js
                 样式/设置子窗口（关闭改隐藏缓存）；hotkey-service.js 全局快捷键；
                 style-settings.js 设置清洗+CSS 生成；system-fonts.js 注册表字体枚举；
+                request-filter.js 遥测/广告域名黑名单拦截（persist:notion 会话）；
                 css-manager.js 合并 CSS 缓存；perf.js 里程碑观测；debounce.js 防抖
 src/preload/    contextBridge 桥：content.js（Notion 页，探针区为生成块）、
                 titlebar.js、settings.js、tray-menu.js
@@ -60,6 +61,7 @@ scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（�
 - **视图加载底色防白闪**：WebContentsView 默认白底，深色主题下新标签/刷新会闪白。**Electron 43 的 WebContentsView 构造选项没有 backgroundColor，传了会被静默忽略**（构造项只有 webPreferences/webContents），必须建实例后调继承自 View 的 `view.setBackgroundColor(themeBackground(getTheme()))`（tab-manager.js 的纯函数）；主题切换时对所有已建视图 `setViewsBackground`。CDP 截图抓的是页面文档（已被 CSS 染深），看不到视图底色层的白闪，验证白闪要看真实屏幕。
 - **后台标签防节流**：标签 WebContentsView 的 webPreferences 带 `backgroundThrottling: false`——后台标签不被 Chromium 节流，切回无重绘顿挫；代价是后台 Notion 定时器持续运行（最多 10 标签，实测可接受）。跟页面缩放一样，标签视图职责在 tabs.js 的 ensureView。
 - **性能相关约定**：缩放快捷键（每 1%）落盘走 debounce.js 防抖（应用缩放本身即时）；合并 CSS 在 css-manager.js 的 createCssProvider 缓存，custom.css 由 watcher 失效；标签切换后顶栏状态走 topbar-relay.js 的 pushNow（探针约 1ms，不等防抖窗口），导航事件才走 schedulePush 防抖合并。启动耗时量化用 `ND_PERF=1`。
+- **遥测/广告域名拦截（request-filter.js）**：Notion 页面内嵌的第三方遥测/营销域名（splunkcloud、gist.build、doubleclick、twitter 广告像素等 8 个）在国内网络下单请求挂起 1~10s，实测把 load 事件拖到 22~27s；会话级拦截后冷启动 load 收敛到 ~4s。清单只收**实测拖慢**的纯遥测/广告域，禁止加入 notion.so / app.notion.com 任何子域（aif/exp/identity 等功能域保留）；新增条目须先用 scripts/cdp-host-timing.js 拿到实测依据。
 - **主题探测与持久化**：Notion 账户主题要等 JS 就绪后才打 dark class，启动早期探测恒为 light——持久化（theme.json，theme-store.js）优先于 `nativeTheme.shouldUseDarkColors`（混合模式系统拿到的是浅色）；启动 15s 宽限期内忽略与持久化 dark 冲突的 light 上报，否则 theme.json 被假象污染。加载期白闪双保险：视图 `backgroundColor` + content.js 的 document-start 早期 `<style>html{background:#191919}`（sendSync get-theme 取值，主题反转时摘除）。
 - **不要提交**：dist/、node_modules/、.playwright-mcp/、docs/superpowers/（均已 gitignore）。
 
