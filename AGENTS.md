@@ -32,7 +32,9 @@ src/main/       主进程：index.js 只剩装配；结构归口到独立模块�
 src/preload/    contextBridge 桥：content.js（Notion 页，探针区为生成块）、
                 titlebar.js、settings.js、tray-menu.js
 src/renderer/   titlebar / tray-menu / style-settings / app-settings 四个渲染页 + error.html
-assets/         default.css 注入样式与图标
+assets/         default.css 注入样式；icon.ico/icon.png/tray.png 由
+                scripts/render-icon.js 从 build/icon.svg 离屏渲染（ico 内嵌 16–256 七档，
+                Windows 按 DPI 自选尺寸，高分屏任务栏/Alt-Tab 不糊；tray.png 32px 同理）
 tests/          node:test 单测（新逻辑先写测试）
 scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（探针生成器）
 ```

@@ -35,7 +35,7 @@ function createSettingsWindows({
       resizable: false,
       skipTaskbar: false,
       show: false,
-      icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
+      icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'),
       webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') },
     });
     wins[kind] = w;

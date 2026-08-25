@@ -145,7 +145,7 @@ function createWindow() {
     minWidth: 640,
     minHeight: 480,
     frame: false,
-    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
+    icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'), // 多尺寸 ico：Windows 按 DPI 自选，高分屏不再发糊
     backgroundColor: themeService.get() === 'dark' ? '#191919' : '#ffffff',
   });
 
