@@ -33,27 +33,69 @@ test('标题栏样式表定义明暗两套 --divider 并用于底部分割线', 
 
 // ── 字体下拉箭头要足够大（用户反馈 11px/15px 均嫌小） ──
 const STYLE_SETTINGS_CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'style-settings', 'style.css'), 'utf8');
+const APP_SETTINGS_CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app-settings', 'style.css'), 'utf8');
+const STYLE_SETTINGS_HTML = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'style-settings', 'index.html'), 'utf8');
+const APP_SETTINGS_HTML = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app-settings', 'index.html'), 'utf8');
 test('样式设置页字体下拉箭头字号不小于 18px', () => {
   const m = STYLE_SETTINGS_CSS.match(/\.font-toggle\s*\{[^}]*font-size:\s*(\d+)px/);
   assert.ok(m, '缺少 .font-toggle font-size');
   assert.ok(Number(m[1]) >= 18, `箭头字号 ${m[1]}px 过小`);
 });
 
-// ── 设置/样式子窗口圆角：body 背景会传播到根画布（整窗矩形），把 border-radius 顶掉。
-//    所以 body 必须透明，背景+圆角由 #win 内层容器绘制（与托盘菜单 #menu 同款结构） ──
-for (const [name, dir] of [['设置', 'app-settings'], ['样式', 'style-settings']]) {
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', dir, 'style.css'), 'utf8');
-  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', dir, 'index.html'), 'utf8');
-  test(`${name}窗口 body 保持透明（不透明 body 背景经传播会顶掉圆角）`, () => {
-    assert.ok(/body\s*\{[^}]*background:\s*transparent/.test(css), 'body 背景必须 transparent');
-  });
-  test(`${name}窗口 #win 容器承担背景/圆角并裁剪圆角处子元素`, () => {
-    assert.ok(/#win\s*\{[^}]*background:\s*var\(--bg\)/.test(css), '#win 缺少背景');
-    assert.ok(/#win\s*\{[^}]*border-radius:\s*4px/.test(css), '#win 缺少与托盘菜单同款的 4px 圆角');
-    assert.ok(/#win\s*\{[^}]*overflow:\s*hidden/.test(css), '#win 缺少 overflow:hidden（关闭按钮 hover 红块会溢出圆角）');
-    assert.ok(/<div id="win">/.test(html), 'HTML 缺少 #win 包裹容器');
-  });
-}
+// ── 子窗口共享基础样式：设置/样式两页（及未来新增子页面）共用
+//    src/renderer/shared/base-win.css，页面 style.css 只留特有控件 ──
+const BASE_WIN_CSS = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'shared', 'base-win.css'), 'utf8');
+
+// body 背景会传播到根画布（整窗矩形），把 border-radius 顶掉。
+// 所以 body 必须透明，背景+圆角由 #win 内层容器绘制（与托盘菜单 #menu 同款结构）
+test('子窗口共享样式：body 保持透明（不透明 body 背景经传播会顶掉圆角）', () => {
+  assert.ok(/body\s*\{[^}]*background:\s*transparent/.test(BASE_WIN_CSS), 'body 背景必须 transparent');
+});
+
+test('子窗口共享样式：#win 容器承担背景/圆角并裁剪圆角处子元素', () => {
+  assert.ok(/#win\s*\{[^}]*background:\s*var\(--bg\)/.test(BASE_WIN_CSS), '#win 缺少背景');
+  assert.ok(/#win\s*\{[^}]*border-radius:\s*4px/.test(BASE_WIN_CSS), '#win 缺少与托盘菜单同款的 4px 圆角');
+  assert.ok(/#win\s*\{[^}]*overflow:\s*hidden/.test(BASE_WIN_CSS), '#win 缺少 overflow:hidden（关闭按钮 hover 红块会溢出圆角）');
+});
+
+test('设置/样式页 HTML：#win 包裹容器 + 共享样式表先于页面样式引入', () => {
+  for (const [name, html] of [['样式', STYLE_SETTINGS_HTML], ['设置', APP_SETTINGS_HTML]]) {
+    assert.ok(/<div id="win">/.test(html), `${name}页缺少 #win 包裹容器`);
+    const i = html.indexOf('../shared/base-win.css');
+    assert.ok(i > -1, `${name}页缺 base-win.css 引用`);
+    assert.ok(i < html.indexOf('href="style.css"'), `${name}页共享样式必须先于页面样式（页面特有规则才可能覆盖）`);
+  }
+});
+
+test('页面 style.css 不再复制共享规则（防回潮）', () => {
+  for (const [name, css] of [['样式', STYLE_SETTINGS_CSS], ['设置', APP_SETTINGS_CSS]]) {
+    assert.ok(!/#win\s*\{/.test(css), `${name}页 style.css 不应再定义 #win（已归共享表）`);
+    assert.ok(!/html\[data-theme="dark"\]/.test(css), `${name}页不应再定义主题变量块（已归共享表）`);
+  }
+});
+
+// ── UA 原生控件（number 调节钮/滚动条）跟随明暗主题：暗色下 spinner 不能是白底 ──
+test('子窗口共享样式声明 color-scheme：UA 控件（数字调节钮/滚动条）跟随明暗主题', () => {
+  assert.ok(/:root,\s*html\[data-theme="light"\]\s*\{[^}]*color-scheme:\s*light/.test(BASE_WIN_CSS), '缺 color-scheme: light（系统暗色+浅色主题时 UA 控件会反向失控）');
+  assert.ok(/html\[data-theme="dark"\]\s*\{[^}]*color-scheme:\s*dark/.test(BASE_WIN_CSS), '缺 color-scheme: dark（暗色下数字调节钮白底）');
+});
+
+// ── 子窗口内容统一可滚动：新增控件不必再调窗口基准高度 ──
+test('子窗口共享样式 #form 可滚动（内容超出窗口时底部可达）', () => {
+  assert.ok(/#form\s*\{[^}]*overflow-y:\s*auto/.test(BASE_WIN_CSS), '#form 缺 overflow-y: auto');
+  assert.ok(/#form\s*\{[^}]*min-height:\s*0/.test(BASE_WIN_CSS), '#form 缺 min-height: 0（flex 子项不缩则无法滚动）');
+  assert.ok(/#form::-webkit-scrollbar\s*\{[^}]*width:\s*8px/.test(BASE_WIN_CSS), '#form 缺主题化滚动条');
+});
+
+// ── 分区头：两页同用 .section 分段（首区 .first 无分隔线），样式归共享表 ──
+test('.section 分区样式归共享表；样式页与设置页同风格分段', () => {
+  assert.ok(/\.section\s*\{[^}]*border-top:\s*1px\s+solid\s+var\(--border\)/.test(BASE_WIN_CSS), '.section 缺顶部分隔线');
+  assert.ok(/\.section\.first\s*\{[^}]*border-top:\s*0/.test(BASE_WIN_CSS), '.section.first 应无分隔线');
+  assert.ok(/class="section first">字体</.test(STYLE_SETTINGS_HTML), '样式页缺「字体」首区');
+  assert.ok(/class="section">版式</.test(STYLE_SETTINGS_HTML), '样式页缺「版式」分区');
+  assert.ok(/class="section">其他</.test(STYLE_SETTINGS_HTML), '样式页缺「其他」分区');
+  assert.ok(/class="section first">快捷键</.test(APP_SETTINGS_HTML), '设置页缺「快捷键」首区');
+});
 
 // ── 标题栏排版一致性：按钮族同宽、顶栏动作与窗口控制之间有主题色分隔线 ──
 test('标题栏侧栏开关与新建标签按钮同宽 36px（按钮族一致）', () => {

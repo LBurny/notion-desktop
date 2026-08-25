@@ -8,8 +8,8 @@ const { sanitizeSettings } = require('../src/main/style-settings');
 
 const TARGETS = {
   menu: { width: 150, height: 160, dir: 'tray-menu', preload: 'tray-menu.js' },
-  style: { width: 400, height: 475, dir: 'style-settings', preload: 'settings.js' },
-  settings: { width: 340, height: 440, dir: 'app-settings', preload: 'settings.js' },
+  style: { width: 400, height: 585, dir: 'style-settings', preload: 'settings.js' },
+  settings: { width: 400, height: 440, dir: 'app-settings', preload: 'settings.js' },
   tabs: { width: 900, height: 36, dir: 'titlebar', preload: 'titlebar.js' },
 };
 

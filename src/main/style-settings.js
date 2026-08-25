@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { pickMathDefaultFont } = require('../renderer/style-settings/font-detect');
 
 const DEFAULT_SETTINGS = {
   fonts: { body: '', ui: '', code: '', math: '' }, // 分区字体：空 = 各槽内置默认栈（ui 不再跟随正文）
@@ -182,7 +183,8 @@ function customFontChain(name, fallbacks) {
 }
 
 // 把设置编译成追加注入的 CSS（排在 default.css / custom.css 之后，优先级最高）
-function buildSettingsCss(s) {
+// installedFonts = 本机已安装字体名（可选），用于公式槽留空时解析 Modern 系默认
+function buildSettingsCss(s, installedFonts) {
   // 无条件：恢复悬停 peek 触发区。custom.css 是旧版 default.css 的副本，
   // 其顶栏块（overflow:hidden + 整区 pointer-events:none）排在 default.css 之后，
   // 会把修复打回原型；这里最后注入兜底覆盖
@@ -205,9 +207,13 @@ function buildSettingsCss(s) {
   if (codeChain || cleanFontName(s.fonts.body) || cleanFontName(s.fonts.ui)) {
     css += `${CODE_SELECTORS} { font-family: ${codeChain || CODE_FONT_STACK} !important; }\n`;
   }
-  // 公式：默认完全交给 default.css（内联 KaTeX_Main / 浮层 Consolas，维持现状），
-  // math 槽自定义时才下发（垫 KaTeX_Main 防缺字形出方框）
-  const mathChain = customFontChain(s.fonts.math, MATH_FONT_STACK);
+  // 公式：math 槽自定义时用用户字体；留空（内置默认）时优先本机已装的 Modern 系
+  // 数学字体——同款字体在不同机器安装名不一（Latin Modern Math / Modern Math /
+  // Latin Modern Roman / Modern），按名称模糊匹配，未装任何 Modern 系才完全交给
+  // default.css 的 KaTeX_Main 默认（维持现状）；链尾垫 KaTeX_Main 防缺字形出方框。
+  // 用户字体只清洗一次（再经 customFontChain 二次 trim 会裁掉清洗后残留的空格）
+  const mathFont = cleanFontName(s.fonts.math) || cleanFontName(pickMathDefaultFont(installedFonts));
+  const mathChain = mathFont ? `"${mathFont}", ${MATH_FONT_STACK}` : null;
   if (mathChain) {
     css += `${MATH_SELECTORS} { font-family: ${mathChain} !important; }\n`;
   }

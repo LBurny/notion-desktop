@@ -274,3 +274,28 @@ test('buildSettingsCss 公式字体名同样过滤引号与反斜杠', () => {
   assert.ok(!css.includes('Evil"'));
   assert.ok(!css.includes('\\'));
 });
+
+test('buildSettingsCss 公式槽留空：内置默认改为本机 Modern 系（模糊匹配已装字体）', () => {
+  const css = buildSettingsCss(DEFAULT_SETTINGS, ['Arial', 'Latin Modern Math', 'Times New Roman', '宋体']);
+  assert.ok(css.includes('"Latin Modern Math", "KaTeX_Main", "Times New Roman", serif'), '默认链垫 KaTeX_Main 防缺字形');
+  assert.ok(css.includes('.katex-display .katex'), '展示公式一并覆盖');
+  // 不同机器安装名不一（Modern Math / Latin Modern Roman / Modern），按模糊匹配落
+  assert.ok(buildSettingsCss(DEFAULT_SETTINGS, ['Arial', 'Modern Math']).includes('"Modern Math",'));
+  assert.ok(buildSettingsCss(DEFAULT_SETTINGS, ['Modern']).includes('"Modern",'));
+});
+
+test('buildSettingsCss 公式槽留空且未装任何 Modern 系：仍不下发（默认维持 default.css）', () => {
+  // Cambria Math 是 Windows 必装的非 Modern 系数学字体，不能误匹配（实测根因：
+  // 只看 math 关键词会让所有 Windows 机器的默认公式字体解析成 Cambria Math）
+  const css = buildSettingsCss(DEFAULT_SETTINGS, ['Arial', 'Times New Roman', '宋体', 'Consolas', 'Cambria Math']);
+  assert.ok(!css.includes('katex'), '无 Modern 系时零变化');
+});
+
+test('buildSettingsCss 公式槽用户填入优先于 Modern 默认', () => {
+  const css = buildSettingsCss(
+    { ...DEFAULT_SETTINGS, fonts: { body: '', ui: '', code: '', math: 'Cambria Math' } },
+    ['Arial', 'Latin Modern Math'],
+  );
+  assert.ok(css.includes('"Cambria Math", "KaTeX_Main", "Times New Roman", serif'));
+  assert.ok(!css.includes('"Latin Modern Math"'), '用户选择不被 Modern 默认覆盖');
+});

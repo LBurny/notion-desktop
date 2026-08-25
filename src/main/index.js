@@ -17,6 +17,7 @@ const { createTabManager, saveTabsFile } = require('./tab-manager');
 const { createTabs } = require('./tabs');
 const { createSettingsWindows } = require('./settings-windows');
 const { attachRequestFilter } = require('./request-filter');
+const { resolveTrayAction } = require('./tray-actions');
 
 const NOTION_URL = 'https://www.notion.so/';
 const TITLEBAR_HEIGHT = 36;
@@ -34,6 +35,14 @@ let styleSettings = null;
 let tabs = null;
 let customCssPath = null;
 let cssProvider = null;
+
+// 系统字体枚举结果进程级缓存（注册表读一次）；供 system-fonts IPC 与
+// buildSettingsCss 的公式 Modern 系默认解析共用
+let cachedFonts = null;
+function getSystemFontsCached() {
+  if (!cachedFonts) cachedFonts = listSystemFonts();
+  return cachedFonts;
+}
 
 const TRAY_MENU_SIZE = { width: 150, height: 160 };
 
@@ -81,7 +90,7 @@ function openSettingsWindow(kind) {
 
 function currentCss() {
   return (cssProvider ? cssProvider.combined() : '')
-    + '\n' + buildSettingsCss(styleSettings || {});
+    + '\n' + buildSettingsCss(styleSettings || {}, getSystemFontsCached());
 }
 
 // 标题栏随页面缩放等比放大（内容 36px × zoomFactor，bounds 必须同步否则裁剪）
@@ -207,12 +216,13 @@ app.whenReady().then(() => {
     },
   });
   // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）。
-  // 样式页更宽（字体下拉输入行长）且高度贴合内容：表单 10 行 + hint（保存提示
-  // 17px）共 ≈470px，475 高度刚包住，底部无大段留白（500 时代留白 ~47px）
+  // 两页同宽 400（统一回落 baseWidth，设置页不再窄于样式页）；高度按内容贴合：
+  // 样式 585（表单 10 行+3 分区头+hint），设置 440；#form 均可滚动兜底
+  // （shared/base-win.css），新增表单行不必再调基准高度
   settingsWindows = createSettingsWindows({
-    baseWidth: 340,
+    baseWidth: 400,
     configs: {
-      style: { width: 400, height: 475, dir: 'style-settings' },
+      style: { height: 585, dir: 'style-settings' },
       app: { height: 440, dir: 'app-settings' },
     },
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
@@ -298,24 +308,15 @@ app.whenReady().then(() => {
 
   ipcMain.on('tray-menu-action', (_e, action) => {
     if (trayMenu) trayMenu.hide();
-    if (action === 'open') {
-      win.show();
-    } else if (action === 'style' || action === 'settings') {
-      win.show();
-      openSettingsWindow(action === 'style' ? 'style' : 'app');
-    } else if (action === 'quit') {
-      isQuitting = true;
-      app.quit();
-    }
+    // 分派表在 tray-actions.js（纯函数）：open 才弹主窗，style/settings 只开子窗口
+    const plan = resolveTrayAction(action);
+    if (plan.quit) { isQuitting = true; app.quit(); return; }
+    if (plan.showMain) win.show();
+    if (plan.settingsKind) openSettingsWindow(plan.settingsKind);
   });
 
   ipcMain.on('get-style-settings', (e) => { e.returnValue = styleSettings; });
-  // 系统字体枚举走注册表（与 Word 同源），结果进程级缓存
-  let cachedFonts = null;
-  ipcMain.on('system-fonts', (e) => {
-    if (!cachedFonts) cachedFonts = listSystemFonts();
-    e.returnValue = cachedFonts;
-  });
+  ipcMain.on('system-fonts', (e) => { e.returnValue = getSystemFontsCached(); });
   ipcMain.handle('style-settings-update', (_e, raw) => {
     styleSettings = sanitizeSettings(raw);
     saveSettings(settingsFile, styleSettings);

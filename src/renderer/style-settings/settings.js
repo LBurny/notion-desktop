@@ -2,6 +2,10 @@ const $ = (id) => document.getElementById(id);
 
 let settings = window.settingsApi.get();
 
+// 公式槽内置默认随本机已装字体模糊匹配（同名文件安装名不一：Latin Modern Math /
+// Modern Math / Modern 等），占位符显示实际解析出的默认，未装 Modern 系才显示 KaTeX_Main
+$('font-math').placeholder = `默认：${window.fontDetect.pickMathDefaultFont(window.settingsApi.systemFonts()) || 'KaTeX_Main'}`;
+
 // 字体下拉：自绘可滚动列表（原生 datalist 弹层不跟主题、小窗内无法滚动）
 // 只列出系统真实安装的候选字体，每项直接用该字体渲染预览；仍可手动输入任意字体名
 // 四个字体槽位（正文/界面/代码/公式）各实例化一个，onChange 接收新值

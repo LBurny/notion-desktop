@@ -19,6 +19,33 @@
     return candidates.filter((f) => isAvailable(f));
   }
 
+  // 公式内置默认优先 Modern 系数学字体：同款字体在不同机器的安装名不一
+  // （Latin Modern Math / Modern Math / Latin Modern Roman / Modern 等），
+  // 按已装字体名模糊匹配——名字必须含 modern 才算 Modern 系（Cambria Math 等
+  // 非 Modern 系的数学字体不参与，否则 Windows 必装的 Cambria Math 会抢位），
+  // 系内含 math 的数学字族最优先，Latin Modern 次之，其余含 modern 的名字
+  // （如 Computer Modern）最后；返回 null 表示未装任何
+  // Modern 系（调用方回落 KaTeX_Main 默认栈，维持 default.css 现状）
+  function pickMathDefaultFont(fontNames) {
+    const norm = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    let best = null;
+    let bestScore = 0;
+    for (const name of fontNames || []) {
+      const n = norm(name);
+      if (!n) continue;
+      let score = 0;
+      if (n.includes('latin modern')) score += 20;
+      if (n.includes('modern')) score += 30;
+      if (score === 0) continue; // 必须含 modern 才入候选
+      if (n.includes('math')) score += 50; // 系内：数学字族优先
+      if (score > bestScore || (score === bestScore && best !== null && n < norm(best))) {
+        best = name;
+        bestScore = score;
+      }
+    }
+    return best;
+  }
+
   // 用等宽字体做基准渲染同一段文字，宽度不同说明候选字体真实存在
   let ctx = null;
   function isFontAvailable(name) {
@@ -31,5 +58,5 @@
     return ctx.measureText(text).width !== baseline;
   }
 
-  return { CANDIDATE_FONTS, filterAvailableFonts, isFontAvailable };
+  return { CANDIDATE_FONTS, filterAvailableFonts, isFontAvailable, pickMathDefaultFont };
 });
