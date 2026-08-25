@@ -23,7 +23,7 @@ function createTabs(deps) {
     onChanged,   // (payload) => void，payload = { tabs, canAdd }
     onEmpty,     // 最后一个标签被关闭
     onTopbarState, // ({ available, favorited }) => void，顶栏一体化状态推送
-    onPageFont,  // (fontFamily) => void，活动页面实际生效字体（供标题栏跟随）
+    onUiFont,   // (fontFamily) => void，活动页实际生效界面字体（供标题栏跟随）
     saveFile,
   } = deps;
 
@@ -41,7 +41,7 @@ function createTabs(deps) {
 
   // 顶栏一体化（动作转发/收藏回读/页面字体）抽至 topbar-relay.js
   const relay = createTopbarRelay({
-    queryWc, getActiveWc: activeNotionWc, onTopbarState, onPageFont,
+    queryWc, getActiveWc: activeNotionWc, onTopbarState, onUiFont,
   });
 
   // ── preload 探针往返 ──
@@ -103,7 +103,7 @@ function createTabs(deps) {
     view.webContents.on('dom-ready', () => {
       if (view.webContents.isDestroyed()) return;
       view.webContents.insertCSS(getCss(), { cssOrigin: 'author' })
-        .then((k) => { rec.cssKey = k; relay.probePageFont(rec); })
+        .then((k) => { rec.cssKey = k; relay.probeUiFont(rec); })
         .catch(() => { /* 页面重载后注入失败可忽略 */ });
       view.webContents.setZoomFactor(getZoom());
     });
@@ -120,7 +120,7 @@ function createTabs(deps) {
       pre.then(() => wc.insertCSS(getCss(), { cssOrigin: 'author' }))
         .then((k) => {
           rec.cssKey = k;
-          if (rec === activeRec) relay.probePageFont(rec);
+          if (rec === activeRec) relay.probeUiFont(rec);
         })
         .catch(() => {});
     });

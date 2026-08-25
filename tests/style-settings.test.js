@@ -215,9 +215,12 @@ test('buildSettingsCss 无条件附带悬停 peek 触发区规则（压过旧版
 
 // ── 分区字体（fonts.{body,ui,code,math}） ──
 
-test('sanitizeSettings 旧版顶层 font 迁移进 fonts.body（新字段优先）', () => {
-  assert.strictEqual(sanitizeSettings({ font: 'X' }).fonts.body, 'X');
+test('sanitizeSettings 旧版顶层 font 迁移进 fonts.body+ui（新字段优先）', () => {
+  const m = sanitizeSettings({ font: 'X' });
+  assert.strictEqual(m.fonts.body, 'X');
+  assert.strictEqual(m.fonts.ui, 'X'); // 旧版全局字体同时作用界面，迁移保留旧外观
   assert.strictEqual(sanitizeSettings({ font: 'X', fonts: { body: 'Y' } }).fonts.body, 'Y');
+  assert.strictEqual(sanitizeSettings({ font: 'X', fonts: { ui: 'Z' } }).fonts.ui, 'Z');
   assert.deepStrictEqual(sanitizeSettings(null).fonts, { body: '', ui: '', code: '', math: '' });
 });
 
@@ -227,12 +230,24 @@ test('sanitizeSettings fonts 返回值不共享 DEFAULT_SETTINGS 引用', () => 
   assert.strictEqual(DEFAULT_SETTINGS.fonts.body, '');
 });
 
-test('buildSettingsCss 界面槽留空跟随正文，填入后独立', () => {
-  const follow = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
-  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "Aa", "Times New Roman", "Microsoft YaHei", serif/.test(follow), 'ui 留空应跟随 body');
+test('buildSettingsCss 界面槽留空用内置默认栈（不跟随正文），填入后独立', () => {
+  const def = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
+  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN"/.test(def), 'ui 留空应回落内置界面默认栈');
+  assert.ok(/\.notion-page-content[^{]*\{[^}]*font-family: "Aa"/.test(def), '正文不受影响');
   const own = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: 'Bb', code: '', math: '' } });
-  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "Bb"/.test(own), 'ui 填入后独立');
+  assert.ok(/\.notion-sidebar[^{]*\{[^}]*font-family: "Bb", "Segoe UI", "Microsoft YaHei", sans-serif/.test(own), 'ui 填入后独立（无衬线回退链）');
   assert.ok(/\.notion-page-content[^{]*\{[^}]*font-family: "Aa"/.test(own), 'body 不受影响');
+});
+
+test('buildSettingsCss 正文规则镜像旧全集选择器（含 contenteditable 高特异性路径）', () => {
+  const css = buildSettingsCss(DEFAULT_SETTINGS);
+  // 根因回归：.notion-page-content * 只有 (0,1,0)，压不过 custom.css 旧副本里
+  // 命中正文文字叶节点的 [contenteditable="true"]:first-of-type (0,2,0)；
+  // 正文规则必须携带同特异性镜像选择器（设置 CSS 最后注入 → 同特异性者赢）
+  assert.ok(css.includes('[contenteditable="true"]:first-of-type'));
+  assert.ok(css.includes('.notion-page-block div[contenteditable="true"]'));
+  assert.ok(css.includes('.notion-page-block > div > div[contenteditable="true"]'));
+  assert.ok(css.includes('.notion-table_of_contents-block *'));
 });
 
 test('buildSettingsCss 代码槽：body 自定义时兜底等宽，code 自定义时换成用户字体', () => {

@@ -24,10 +24,10 @@ function setup(wc, opts = {}) {
   const states = [];
   const fonts = [];
   const relay = createTopbarRelay({
-    queryWc: async (w, req) => (req === 'page-font-query' ? w.font : w.favorite),
+    queryWc: async (w, req) => (req === 'ui-font-query' ? w.font : w.favorite),
     getActiveWc: () => wc,
     onTopbarState: (s) => states.push(s),
-    onPageFont: (f) => fonts.push(f),
+    onUiFont: (f) => fonts.push(f),
     ...FAST,
     ...opts,
   });
@@ -87,11 +87,11 @@ test('探针非 boolean 时 favorited 归 null', async () => {
   assert.deepEqual(states[0], { available: true, favorited: null });
 });
 
-test('probePageFont：采到字体即回调；空结果递远重试后放弃', async () => {
+test('probeUiFont：采到字体即回调；空结果递远重试后放弃', async () => {
   const wc = makeWc({ font: 'LXGW, serif' });
   const { relay, fonts } = setup(wc);
   const rec = { view: { webContents: wc } };
-  await relay.probePageFont(rec);
+  await relay.probeUiFont(rec);
   assert.deepEqual(fonts, ['LXGW, serif']);
 
   // 空字体 + 未渲染：重试 4 次后放弃（base 10ms → 10+20+30+40）
@@ -101,22 +101,22 @@ test('probePageFont：采到字体即回调；空结果递远重试后放弃', a
     queryWc: async () => null,
     getActiveWc: () => empty,
     onTopbarState() {},
-    onPageFont: (f) => fonts2.push(f),
+    onUiFont: (f) => fonts2.push(f),
     ...FAST,
   });
   const t0 = Date.now();
-  await relay2.probePageFont({ view: { webContents: empty } });
+  await relay2.probeUiFont({ view: { webContents: empty } });
   assert.deepEqual(fonts2, []);
   assert.ok(Date.now() - t0 >= 95, '应走完 4 次递远重试');
 });
 
-test('probePageFont：视图销毁/错误页不探测', async () => {
+test('probeUiFont：视图销毁/错误页不探测', async () => {
   const wc = makeWc();
   wc._destroyed = true;
   const { relay, fonts } = setup(wc);
-  await relay.probePageFont({ view: { webContents: wc } });
+  await relay.probeUiFont({ view: { webContents: wc } });
   assert.deepEqual(fonts, []);
   const errWc = makeWc({ url: 'file:///error.html' });
-  await relay.probePageFont({ view: { webContents: errWc } });
+  await relay.probeUiFont({ view: { webContents: errWc } });
   assert.deepEqual(fonts, []);
 });

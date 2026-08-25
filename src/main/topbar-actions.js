@@ -75,13 +75,13 @@ function quickFindStateOf(root) {
   };
 }
 
-// 页面正文代表元素（探测计算字体的采样点）：default.css / custom.css /
-// 设置字体三类注入都覆盖这些选择器；都不存在 = 页面尚未渲染就绪
-const CONTENT_FONT_SELECTORS = ['.notion-page-content', '[data-testid="page-title"]'];
+// 页面界面代表元素（探测计算字体的采样点）：标题栏跟随界面字体（fonts.ui 槽），
+// 探测侧栏/顶栏的计算字体（含 custom.css 与设置注入的效果）；都不存在 = 页面尚未渲染就绪
+const UI_FONT_SELECTORS = ['.notion-sidebar', '.notion-topbar', '.notion-breadcrumb'];
 
-// 读页面实际生效的 font-family（getComputedStyle 跟随全部注入 CSS，含 custom.css）
-function pageFontOf(root, getComputedStyle) {
-  for (const sel of CONTENT_FONT_SELECTORS) {
+// 读页面实际生效的界面 font-family（getComputedStyle 跟随全部注入 CSS，含 custom.css）
+function uiFontOf(root, getComputedStyle) {
+  for (const sel of UI_FONT_SELECTORS) {
     const el = root.querySelector(sel);
     if (!el) continue;
     const font = (getComputedStyle(el).fontFamily || '').trim();
@@ -93,5 +93,5 @@ function pageFontOf(root, getComputedStyle) {
 module.exports = {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
   favoriteStateOf, quickFindStateOf,
-  pageFontOf, CONTENT_FONT_SELECTORS,
+  uiFontOf, UI_FONT_SELECTORS,
 };

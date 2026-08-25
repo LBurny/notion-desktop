@@ -120,7 +120,7 @@ window.addEventListener('keydown', (e) => {
 // 本区块由 scripts/build-preload-probes.js 生成，勿手改。
 // 改探针逻辑请改 src/main/topbar-actions.js 后运行 npm run sync-probes
 const TOPBAR_ACTIONS = {"sidebar":{"toggle":true,"openSelectors":[".notion-open-sidebar",".notion-topbar [aria-label=\"Lock sidebar open\"]",".notion-topbar [aria-label=\"Open sidebar\"]"],"closeSelectors":[".notion-sidebar [aria-label=\"Close sidebar\"]"],"selectors":[".notion-open-sidebar",".notion-topbar [aria-label=\"Lock sidebar open\"]",".notion-topbar [aria-label=\"Open sidebar\"]",".notion-sidebar [aria-label=\"Close sidebar\"]"]},"share":{"selectors":[".notion-topbar-share-menu",".notion-topbar [aria-label=\"Share\"]"]},"favorite":{"selectors":[".notion-topbar-favorite-button",".notion-topbar [aria-label=\"Favorite\"]",".notion-topbar [aria-label=\"Favorited\"]"]},"more":{"selectors":[".notion-topbar-more-button",".notion-topbar [aria-label=\"Actions\"]"]}};
-const CONTENT_FONT_SELECTORS = [".notion-page-content","[data-testid=\"page-title\"]"];
+const UI_FONT_SELECTORS = [".notion-sidebar",".notion-topbar",".notion-breadcrumb"];
 function pickTopbarButton(root, selectors) {
   for (const sel of selectors) {
     const el = root.querySelector(sel);
@@ -164,8 +164,8 @@ function quickFindStateOf(root) {
     anyDialog: !!root.querySelector('[role="dialog"]'),
   };
 }
-function pageFontOf(root, getComputedStyle) {
-  for (const sel of CONTENT_FONT_SELECTORS) {
+function uiFontOf(root, getComputedStyle) {
+  for (const sel of UI_FONT_SELECTORS) {
     const el = root.querySelector(sel);
     if (!el) continue;
     const font = (getComputedStyle(el).fontFamily || '').trim();
@@ -200,8 +200,8 @@ ipcRenderer.on('quick-find-state-query', () => {
   ipcRenderer.send('quick-find-state', quickFindStateOf(document));
 });
 
-ipcRenderer.on('page-font-query', () => {
-  ipcRenderer.send('page-font', pageFontOf(document, window.getComputedStyle));
+ipcRenderer.on('ui-font-query', () => {
+  ipcRenderer.send('ui-font', uiFontOf(document, window.getComputedStyle));
 });
 
 contextBridge.exposeInMainWorld('notionDesktop', {

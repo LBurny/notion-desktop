@@ -62,7 +62,7 @@ function setup({ theme = 'dark' } = {}) {
       getZoom: () => 1,
       getTheme: () => theme,
       getSlashCommands: () => [],
-      onChanged() {}, onEmpty() {}, onTopbarState() {}, onPageFont() {},
+      onChanged() {}, onEmpty() {}, onTopbarState() {}, onUiFont() {},
       saveFile() {},
     });
     return { tabs, created, log };

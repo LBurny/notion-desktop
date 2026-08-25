@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
-  favoriteStateOf, quickFindStateOf, pageFontOf, CONTENT_FONT_SELECTORS,
+  favoriteStateOf, quickFindStateOf, uiFontOf, UI_FONT_SELECTORS,
 } = require('../src/main/topbar-actions');
 
 // 极简 DOM stub：按选择器表命中预设元素
@@ -151,22 +151,22 @@ test('quickFindStateOf：带输入框的浮层才算 Quick Find 打开', () => {
   assert.deepStrictEqual(quickFindStateOf(stubDoc({})), { open: false, anyDialog: false });
 });
 
-test('pageFontOf 返回 .notion-page-content 的计算字体', () => {
+test('uiFontOf 返回 .notion-sidebar 的计算字体（标题栏跟随界面字体）', () => {
   const el = {};
   const gcs = (e) => ({ fontFamily: e === el ? '"思源宋体 CN", serif' : 'should-not-use' });
-  assert.strictEqual(pageFontOf(stubDoc({ '.notion-page-content': el }), gcs), '"思源宋体 CN", serif');
+  assert.strictEqual(uiFontOf(stubDoc({ '.notion-sidebar': el }), gcs), '"思源宋体 CN", serif');
 });
 
-test('pageFontOf 首选元素缺失时按 CONTENT_FONT_SELECTORS 顺序回退', () => {
+test('uiFontOf 首选元素缺失时按 UI_FONT_SELECTORS 顺序回退（顶栏/面包屑）', () => {
   const el = {};
-  const fallbackSel = CONTENT_FONT_SELECTORS[1];
+  const fallbackSel = UI_FONT_SELECTORS[1];
   const gcs = (e) => ({ fontFamily: e === el ? '"X", serif' : '' });
-  assert.strictEqual(pageFontOf(stubDoc({ [fallbackSel]: el }), gcs), '"X", serif');
+  assert.strictEqual(uiFontOf(stubDoc({ [fallbackSel]: el }), gcs), '"X", serif');
 });
 
-test('pageFontOf 页面未就绪或字体为空时返回 null', () => {
-  assert.strictEqual(pageFontOf(stubDoc({}), () => ({ fontFamily: 'x' })), null);
+test('uiFontOf 页面未就绪或字体为空时返回 null', () => {
+  assert.strictEqual(uiFontOf(stubDoc({}), () => ({ fontFamily: 'x' })), null);
   const el = {};
-  assert.strictEqual(pageFontOf(stubDoc({ [CONTENT_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '' })), null);
-  assert.strictEqual(pageFontOf(stubDoc({ [CONTENT_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '   ' })), null);
+  assert.strictEqual(uiFontOf(stubDoc({ [UI_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '' })), null);
+  assert.strictEqual(uiFontOf(stubDoc({ [UI_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '   ' })), null);
 });

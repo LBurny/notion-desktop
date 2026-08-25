@@ -206,11 +206,13 @@ app.whenReady().then(() => {
       if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
     },
   });
-  // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）
+  // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）。
+  // 样式页更宽（字体下拉输入行长）且高度贴合内容：表单 10 行 + hint（保存提示
+  // 17px）共 ≈470px，475 高度刚包住，底部无大段留白（500 时代留白 ~47px）
   settingsWindows = createSettingsWindows({
     baseWidth: 340,
     configs: {
-      style: { height: 500, dir: 'style-settings' },
+      style: { width: 400, height: 475, dir: 'style-settings' },
       app: { height: 440, dir: 'app-settings' },
     },
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
@@ -255,9 +257,9 @@ app.whenReady().then(() => {
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
     getTheme: () => themeService.get(),
     getSlashCommands: () => (styleSettings ? styleSettings.slashCommands : []),
-    onPageFont: (font) => {
+    onUiFont: (font) => {
       if (titlebarView && !titlebarView.webContents.isDestroyed()) {
-        titlebarView.webContents.send('page-font-changed', font);
+        titlebarView.webContents.send('ui-font-changed', font);
       }
     },
     onChanged: () => {

@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('titlebarApi', {
   onMaximized: (cb) => ipcRenderer.on('window-maximized', (_e, flag) => cb(flag)),
   getStyle: () => ipcRenderer.sendSync('get-style-settings'),
   onStyle: (cb) => ipcRenderer.on('style-changed', (_e, s) => cb(s)),
-  onPageFont: (cb) => ipcRenderer.on('page-font-changed', (_e, font) => cb(font)),
+  onUiFont: (cb) => ipcRenderer.on('ui-font-changed', (_e, font) => cb(font)),
 });
 
 contextBridge.exposeInMainWorld('tabsApi', {

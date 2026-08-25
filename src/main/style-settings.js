@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DEFAULT_SETTINGS = {
-  fonts: { body: '', ui: '', code: '', math: '' }, // 分区字体：空 = 各槽内置默认（ui 空 = 跟随 body）
+  fonts: { body: '', ui: '', code: '', math: '' }, // 分区字体：空 = 各槽内置默认栈（ui 不再跟随正文）
   lineHeight: 1.73,
   paragraphSpacing: 0, // px，块与块之间的额外上边距
   zoom: 1,             // setZoomFactor，默认 100%
@@ -64,8 +64,11 @@ function sanitizeSettings(raw) {
         if (typeof raw.fonts[k] === 'string') s.fonts[k] = raw.fonts[k].slice(0, 100);
       }
     }
-    // 旧版迁移：顶层 font → fonts.body（新字段非空时优先）
+    // 旧版迁移：顶层 font → fonts.body + fonts.ui（旧版全局字体同时作用正文与界面，
+    // 双双写入保留旧外观——ui 从「跟随 body」改为「内置默认/独立槽」后，只迁 body
+    // 会让存量用户界面字体在升级时静默跳变；新字段非空时优先）
     if (!s.fonts.body && typeof raw.font === 'string') s.fonts.body = raw.font.slice(0, 100);
+    if (!s.fonts.ui && typeof raw.font === 'string') s.fonts.ui = raw.font.slice(0, 100);
     if (Number.isFinite(raw.lineHeight)) s.lineHeight = Math.min(3, Math.max(1, raw.lineHeight));
     if (Number.isFinite(raw.paragraphSpacing)) {
       s.paragraphSpacing = Math.min(30, Math.max(0, Math.round(raw.paragraphSpacing)));
@@ -117,10 +120,50 @@ const DEFAULT_FONT_STACK = '"思源宋体 CN", "Times New Roman", "Source Han Se
 const CODE_FONT_STACK = '"Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace';
 const MATH_FONT_STACK = '"KaTeX_Main", "Times New Roman", serif';
 
-// 正文/界面选择器分组：两组合计与旧版统一 FONT_SELECTORS 完全同集（默认外观零变化）；
+// 正文/界面选择器分组：两组合计与旧版统一 FONT_SELECTORS 完全同集（default.css 全局字体表
+// 的内容侧/界面侧拆分，默认外观零变化）。必须镜像完整选择器表，不能用 .notion-page-content *
+// 简化：* 不贡献特异性（0,1,0），压不过 custom.css 旧副本里命中正文文字叶节点的
+// [contenteditable="true"]:first-of-type (0,2,0)——正文文字会落在旧栈上（分区字体失效的根因，
+// CDP 实测）。同特异性镜像 + 设置 CSS 最后注入 → 稳定覆盖 custom.css 旧副本。
 // 页面大标题是内容的组成部分归正文；Quick Find 等浮层归界面（与现状一致）
-const BODY_SELECTORS = '.notion-page-content, .notion-page-content *, [data-testid="page-title"]';
-const UI_SELECTORS = '.notion-sidebar, .notion-sidebar *, .notion-topbar, .notion-topbar *, .notion-breadcrumb, .notion-breadcrumb *, [role="dialog"], [role="dialog"] *';
+const BODY_SELECTORS = [
+  '[data-testid="page-title"]',
+  '.notion-page-block .notion-page-block',
+  '.notion-page-block .notion-selectable',
+  '.notion-scroller > div > [data-block-id] .notion-page-block',
+  '.notion-page-block > div > div[contenteditable="true"]',
+  '.notion-page-block > div > div[contenteditable="true"] *',
+  '.notion-header-block', '.notion-sub_header-block', '.notion-sub_sub_header-block',
+  '.notion-header-block *', '.notion-sub_header-block *', '.notion-sub_sub_header-block *',
+  '.notion-text-block', '.notion-to_do-block', '.notion-bulleted_list-block',
+  '.notion-numbered_list-block', '.notion-quote-block', '.notion-callout-block',
+  '.notion-toggle-block', '.notion-table-block', '.notion-bookmark-block',
+  '.notion-page-content', '.notion-page-content *',
+  'h1', 'h1 *',
+  '[placeholder="Untitled"]', '[placeholder="Page title"]', '[placeholder="Heading 1"]',
+  '[contenteditable="true"]:first-of-type', '[contenteditable="true"]:first-of-type *',
+  '.notion-table_of_contents-block', '.notion-table_of_contents-block *',
+  '.notion-link-page', '.notion-link-page *',
+  '.notion-page-link', '.notion-page-link *',
+  '.notion-page-view-header', '.notion-page-view-header *',
+  '.notion-page-header', '.notion-page-header *',
+  '.notion-page-block div[contenteditable="true"]', '.notion-page-block div[contenteditable="true"] *',
+].join(', ');
+const UI_SELECTORS = [
+  '.notion-sidebar', '.notion-sidebar *',
+  '.notion-topbar', '.notion-topbar *',
+  '.notion-breadcrumb', '.notion-breadcrumb *',
+  '[role="dialog"]', '[role="dialog"] *',
+  '[role="search"]', '[role="search"] *',
+  '[placeholder="Search"]', '[placeholder="Search"] *',
+  '[placeholder="Search or jump to…"]', '[placeholder="Search or jump to…"] *',
+  '[placeholder="Type a command or search…"]', '[placeholder="Type a command or search…"] *',
+  'input[type="text"]', 'input[type="text"] *',
+  '.notion-overlay-container', '.notion-overlay-container *',
+  '.notion-dialog', '.notion-dialog *',
+  '.notion-quick-find', '.notion-quick-find *',
+  '.notion-search', '.notion-search *',
+].join(', ');
 const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *';
 // 公式内联规则必须复用 default.css 同特异性 (0,4,0) 的 :not 选择器（同特异性后注入者赢）；
 // 展示公式与浮层预览无竞争，直接覆盖
@@ -149,10 +192,12 @@ function buildSettingsCss(s) {
   // 必须靠最后注入的设置 CSS 覆盖才能切到左/右/居中
   css += `.notion-text-block { text-align: ${s.align} !important; }\n`;
   // 分区字体无条件下发（兜底覆盖 custom.css 旧副本，同对齐规则的理由）；
-  // 各槽空 = 内置默认栈，ui 空 = 跟随 body，自定义回退链统一垫雅黑防拉丁-only 字体的中文落宋体
+  // 各槽空 = 内置默认栈；ui 空 = 界面内置默认栈（与正文同栈，默认外观与现状一致，
+  // 但不再跟随正文——控制条/侧栏/浮层字体独立于正文）；自定义回退链统一垫雅黑防
+  // 拉丁-only 字体的中文落宋体（界面垫 Segoe UI 走无衬线）
   const bodyChain = customFontChain(s.fonts.body, '"Times New Roman", "Microsoft YaHei", serif') || DEFAULT_FONT_STACK;
   css += `${BODY_SELECTORS} { font-family: ${bodyChain} !important; }\n`;
-  const uiChain = customFontChain(s.fonts.ui, '"Times New Roman", "Microsoft YaHei", serif') || bodyChain;
+  const uiChain = customFontChain(s.fonts.ui, '"Segoe UI", "Microsoft YaHei", sans-serif') || DEFAULT_FONT_STACK;
   css += `${UI_SELECTORS} { font-family: ${uiChain} !important; }\n`;
   // 代码块：正文/界面自定义时 .notion-page-content * 等同特异性规则会盖过 default.css
   // 的等宽规则，必须重新兜底；code 槽自定义时换成用户字体

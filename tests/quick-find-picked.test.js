@@ -97,7 +97,7 @@ function setup(log, opts) {
     onChanged() {},
     onEmpty() {},
     onTopbarState() {},
-    onPageFont() {},
+    onUiFont() {},
     saveFile() {},
   });
 }

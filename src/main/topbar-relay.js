@@ -6,7 +6,7 @@ const { TOPBAR_ACTIONS } = require('./topbar-actions');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 function createTopbarRelay({
-  queryWc, getActiveWc, onTopbarState, onPageFont,
+  queryWc, getActiveWc, onTopbarState, onUiFont,
   navDebounceMs = 300, favoriteSettleMs = 400, fontRetryBaseMs = 800,
 }) {
   async function topbarAction(action) {
@@ -39,24 +39,24 @@ function createTopbarRelay({
     probeState();
   }
 
-  // 页面实际生效字体 → onPageFont（标题栏跟随）。CSS 注入完成时正文可能尚未
-  // 渲染（Notion 懒加载），递远重试直到采到或放弃
-  async function probePageFont(rec, attempt = 0) {
+  // 页面实际生效的界面字体 → onUiFont（标题栏跟随，标题栏属界面而非正文）。
+  // CSS 注入完成时侧栏/顶栏可能尚未渲染（Notion 懒加载），递远重试直到采到或放弃
+  async function probeUiFont(rec, attempt = 0) {
     const wc = rec.view && rec.view.webContents;
     if (!wc || wc.isDestroyed() || wc.getURL().startsWith('file://')) return;
-    const font = await queryWc(wc, 'page-font-query', null, 'page-font');
+    const font = await queryWc(wc, 'ui-font-query', null, 'ui-font');
     if (typeof font === 'string' && font.trim()) {
-      if (onPageFont) onPageFont(font);
+      if (onUiFont) onUiFont(font);
       return;
     }
     if (attempt < 4) {
       await sleep(fontRetryBaseMs * (attempt + 1));
-      return probePageFont(rec, attempt + 1);
+      return probeUiFont(rec, attempt + 1);
     }
     return undefined;
   }
 
-  return { topbarAction, schedulePush, pushNow, probePageFont };
+  return { topbarAction, schedulePush, pushNow, probeUiFont };
 }
 
 module.exports = { createTopbarRelay };

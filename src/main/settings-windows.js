@@ -11,7 +11,10 @@ function createSettingsWindows({
   const wins = {}; // kind → BrowserWindow | null
 
   function sizeFor(kind, zoom, area) {
-    return settingsWindowSize(baseWidth, configs[kind].height, zoom, area.width - 40, area.height - 40);
+    const cfg = configs[kind];
+    // 各子窗口可单独定宽（样式页比设置页宽），未给时回落统一 baseWidth
+    const w = Number.isFinite(cfg.width) ? cfg.width : baseWidth;
+    return settingsWindowSize(w, cfg.height, zoom, area.width - 40, area.height - 40);
   }
 
   function open(kind) {

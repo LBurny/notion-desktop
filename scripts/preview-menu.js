@@ -4,16 +4,18 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { listSystemFonts } = require('../src/main/system-fonts');
+const { sanitizeSettings } = require('../src/main/style-settings');
 
 const TARGETS = {
   menu: { width: 150, height: 160, dir: 'tray-menu', preload: 'tray-menu.js' },
-  style: { width: 340, height: 380, dir: 'style-settings', preload: 'settings.js' },
+  style: { width: 400, height: 475, dir: 'style-settings', preload: 'settings.js' },
   settings: { width: 340, height: 440, dir: 'app-settings', preload: 'settings.js' },
   tabs: { width: 900, height: 36, dir: 'titlebar', preload: 'titlebar.js' },
 };
 
 const DEMO_SETTINGS = {
-  font: '思源宋体 CN', lineHeight: 1.73, paragraphSpacing: 4, zoom: 1.05, hideHelp: true, dividerWidth: 1.5, align: 'justify',
+  fonts: { body: '思源宋体 CN', ui: '', code: '', math: '' },
+  lineHeight: 1.73, paragraphSpacing: 4, zoom: 1.05, hideHelp: true, dividerWidth: 1.5, align: 'justify',
   hotkeys: { zoomIn: 'Ctrl+Shift+=', zoomOut: 'Ctrl+Shift+-', toggleWindow: 'Ctrl+`' },
   slashCommands: [{ combo: 'Ctrl+Shift+M', command: 'math' }, { combo: 'Ctrl+Shift+D', command: 'divider' }],
   closeAction: 'tray',
@@ -32,7 +34,7 @@ app.whenReady().then(async () => {
   let theme = 'light';
   ipcMain.on('get-theme', (e) => { e.returnValue = theme; });
   ipcMain.on('tray-menu-action', () => {});
-  ipcMain.on('get-style-settings', (e) => { e.returnValue = DEMO_SETTINGS; });
+  ipcMain.on('get-style-settings', (e) => { e.returnValue = sanitizeSettings(DEMO_SETTINGS); });
   ipcMain.on('system-fonts', (e) => { e.returnValue = listSystemFonts(); });
   ipcMain.handle('style-settings-update', () => true);
   ipcMain.on('settings-close', () => {});
@@ -79,7 +81,7 @@ app.whenReady().then(async () => {
   // 样式页追加验证：字体下拉展开态（自绘列表，跟随主题，可滚动）
   if (name === 'style') {
     const n = await win.webContents.executeJavaScript(
-      "document.getElementById('font-toggle').click(); document.querySelectorAll('#font-options li').length"
+      "document.querySelector('.font-combo .font-toggle').click(); document.querySelector('.font-combo .font-options').querySelectorAll('li').length"
     );
     await new Promise((r) => setTimeout(r, 400));
     const img = await win.webContents.capturePage();

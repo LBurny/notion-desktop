@@ -76,7 +76,7 @@ function setup({ zoom = 1, theme = 'dark', quitting = false } = {}) {
   const state = { zoom, theme, quitting };
   const svc = createSettingsWindows({
     baseWidth: 340,
-    configs: { style: { height: 380, dir: 'style-settings' }, app: { height: 440, dir: 'app-settings' } },
+    configs: { style: { width: 400, height: 475, dir: 'style-settings' }, app: { height: 440, dir: 'app-settings' } },
     getZoom: () => state.zoom,
     getTheme: () => state.theme,
     getAnchorBounds: () => ({ x: 0, y: 0, width: 1200, height: 800 }),
@@ -89,19 +89,26 @@ test('open 创建窗口：尺寸随缩放、居中、就绪后 zoom+theme', () =
   const { svc } = setup({ zoom: 1, theme: 'dark' });
   const w = svc.open('style');
   assert.equal(FakeBrowserWindow.all.length, 1);
-  assert.equal(w.opts.width, 340);
-  assert.equal(w.opts.height, 380);
+  assert.equal(w.opts.width, 400); // 样式页比设置页宽（字体下拉输入行长）
+  assert.equal(w.opts.height, 475); // 贴合内容（表单+hint ≈470px），底部无大段留白
   // 透明窗口（body 圆角由页面 CSS 绘制），不再设置不透明底色
   assert.equal(w.opts.transparent, true);
   assert.equal(w.opts.backgroundColor, undefined);
   assert.match(w.htmlFile, /style-settings/);
   // 居中于 1920x1040 工作区
-  assert.deepEqual(w.pos, { x: Math.round((1920 - 340) / 2), y: Math.round((1040 - 380) / 2) });
+  assert.deepEqual(w.pos, { x: Math.round((1920 - 400) / 2), y: Math.round((1040 - 475) / 2) });
   w.emit('ready-to-show');
   assert.equal(w.shown, 1);
   w.emitWc('did-finish-load');
   assert.equal(w.zoom, 1);
   assert.deepEqual(w.sent, [['theme-changed', 'dark']]);
+});
+
+test('open 未单独定宽的窗口回落 baseWidth（设置页 340）', () => {
+  const { svc } = setup();
+  const w = svc.open('app');
+  assert.equal(w.opts.width, 340);
+  assert.equal(w.opts.height, 440);
 });
 
 test('同 kind 重复 open：不新建，show+focus 复用', () => {
@@ -141,7 +148,7 @@ test('applyZoom：存活窗口 setZoomFactor + setContentSize 随缩放等比放
   state.zoom = 1.5;
   svc.applyZoom();
   assert.equal(w.zoom, 1.5);
-  assert.deepEqual(w.contentSize, { w: 510, h: 570 }); // 340/380 × 1.5
+  assert.deepEqual(w.contentSize, { w: 600, h: 713 }); // 400/475 × 1.5（475×1.5=712.5 取整）
 });
 
 test('broadcastTheme：给所有存活窗口发 theme-changed；已销毁跳过', () => {

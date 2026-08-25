@@ -5,7 +5,7 @@ const path = require('path');
 
 const BEGIN = '// [probes:generated begin]';
 const END = '// [probes:generated end]';
-const FUNCS = ['pickTopbarButton', 'sidebarStateOf', 'createSidebarToggleRunner', 'favoriteStateOf', 'quickFindStateOf', 'pageFontOf'];
+const FUNCS = ['pickTopbarButton', 'sidebarStateOf', 'createSidebarToggleRunner', 'favoriteStateOf', 'quickFindStateOf', 'uiFontOf'];
 
 function buildBlock() {
   const m = require('../src/main/topbar-actions');
@@ -14,7 +14,7 @@ function buildBlock() {
     '// 本区块由 scripts/build-preload-probes.js 生成，勿手改。',
     '// 改探针逻辑请改 src/main/topbar-actions.js 后运行 npm run sync-probes',
     `const TOPBAR_ACTIONS = ${JSON.stringify(m.TOPBAR_ACTIONS)};`,
-    `const CONTENT_FONT_SELECTORS = ${JSON.stringify(m.CONTENT_FONT_SELECTORS)};`,
+    `const UI_FONT_SELECTORS = ${JSON.stringify(m.UI_FONT_SELECTORS)};`,
   ];
   for (const name of FUNCS) {
     if (typeof m[name] !== 'function') throw new Error(`topbar-actions 缺少导出: ${name}`);

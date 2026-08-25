@@ -13,12 +13,13 @@ window.titlebarApi.onMaximized((isMax) => {
   btnMax.innerHTML = isMax ? '&#10064;' : '&#9634;';
 });
 
-// 标题栏字体跟随页面实际生效字体：主进程探测活动页的计算 font-family
-//（含 custom.css 与设置注入的效果），探测值未到时用设置页的字体字段兜底
-let pageFont = '';
+// 标题栏属界面：跟随页面探测到的界面计算字体（侧栏/顶栏，含 custom.css 与
+// fonts.ui 设置注入的效果），探测值未到时用设置页的界面字体字段兜底
+let uiFont = '';
 let lastStyle = null;
 function applyTitleFont() {
-  document.body.style.fontFamily = window.titleFont.titlebarFontFamily(pageFont, lastStyle && lastStyle.font);
+  const ui = lastStyle && lastStyle.fonts && typeof lastStyle.fonts.ui === 'string' ? lastStyle.fonts.ui : '';
+  document.body.style.fontFamily = window.titleFont.titlebarFontFamily(uiFont, ui);
 }
 function applyDivider() {
   const w = lastStyle && Number.isFinite(lastStyle.dividerWidth) ? lastStyle.dividerWidth : 1;
@@ -28,7 +29,7 @@ function applyStyle() { applyTitleFont(); applyDivider(); }
 lastStyle = window.titlebarApi.getStyle();
 applyStyle();
 window.titlebarApi.onStyle((s) => { lastStyle = s; applyStyle(); });
-window.titlebarApi.onPageFont((f) => { pageFont = f; applyTitleFont(); });
+window.titlebarApi.onUiFont((f) => { uiFont = f; applyTitleFont(); });
 
 // ---------- 标签条 ----------
 const tabsEl = document.getElementById('tabs');
