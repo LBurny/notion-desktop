@@ -28,4 +28,17 @@ function watchCustomCss(customCssPath, onChange, delay = 300) {
   };
 }
 
-module.exports = { ensureCustomCss, readCombinedCss, watchCustomCss };
+// 合并结果进程内缓存：custom.css 由 watcher 失效；设置变化只影响 buildSettingsCss
+// 输出（不触碰文件），缓存无需因此失效
+function createCssProvider(defaultCssPath, customCssPath) {
+  let cached = null;
+  return {
+    combined() {
+      if (cached === null) cached = readCombinedCss(defaultCssPath, customCssPath);
+      return cached;
+    },
+    invalidate() { cached = null; },
+  };
+}
+
+module.exports = { ensureCustomCss, readCombinedCss, watchCustomCss, createCssProvider };

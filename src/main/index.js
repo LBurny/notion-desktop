@@ -1,14 +1,21 @@
+// V8 编译缓存：加速冷启动的模块编译（Node 22.1+；旧运行时静默跳过）
+try { require('node:module').enableCompileCache(); } catch { /* 无此 API 时忽略 */ }
 const path = require('path');
 const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, screen, nativeTheme, Tray, Menu, globalShortcut } = require('electron');
+const { createPerf } = require('./perf');
 const { loadState, isVisibleOnSomeDisplay, trackWindow } = require('./window-state');
-const { ensureCustomCss, readCombinedCss, watchCustomCss } = require('./css-manager');
+const { ensureCustomCss, createCssProvider, watchCustomCss } = require('./css-manager');
+const { debounce } = require('./debounce');
 const { calcMenuPosition } = require('./menu-position');
-const { loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss, titlebarHeightForZoom, settingsWindowSize } = require('./style-settings');
-const { loadTheme, saveTheme } = require('./theme-store');
+const { loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss, titlebarHeightForZoom } = require('./style-settings');
+const { loadTheme } = require('./theme-store');
+const { createThemeService } = require('./theme-service');
+const { createHotkeys } = require('./hotkey-service');
 const { comboToAccelerator } = require('./hotkeys');
 const { listSystemFonts } = require('./system-fonts');
 const { createTabManager, saveTabsFile } = require('./tab-manager');
 const { createTabs } = require('./tabs');
+const { createSettingsWindows } = require('./settings-windows');
 
 const NOTION_URL = 'https://www.notion.so/';
 const TITLEBAR_HEIGHT = 36;
@@ -18,32 +25,28 @@ let win;
 let titlebarView;
 let settingsFile = null;
 let themeFile = null;
-let bootedAt = 0;
-let currentTheme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+let themeService = null;
 let tray = null;
 let trayMenu = null;
 let isQuitting = false;
 let styleSettings = null;
 let tabs = null;
 let customCssPath = null;
+let cssProvider = null;
 
 const TRAY_MENU_SIZE = { width: 150, height: 160 };
 
-const SETTINGS_WINDOW_WIDTH = 340;
+// ND_PERF=1 时输出启动/加载里程碑耗时
+const perf = createPerf({ enabled: !!process.env.ND_PERF });
 
-// 「样式」与「设置」两个子窗口的配置；内容后续会持续扩充
-// 高度为缩放 100% 时的基准值，实际开窗按 settingsWindowSize 随页面缩放等比放大
-const SETTINGS_WINDOWS = {
-  style: { height: 380, dir: 'style-settings' },
-  app: { height: 440, dir: 'app-settings' },
-};
-const settingsWins = { style: null, app: null };
+let settingsWindows = null;
 
 // 主题广播：标题栏、托盘菜单、样式/设置窗哪个开着就发给哪个
 function broadcastTheme(theme) {
-  for (const v of [titlebarView, trayMenu, settingsWins.style, settingsWins.app]) {
+  for (const v of [titlebarView, trayMenu]) {
     if (v && !v.webContents.isDestroyed()) v.webContents.send('theme-changed', theme);
   }
+  if (settingsWindows) settingsWindows.broadcastTheme(theme);
 }
 
 function showTrayMenu(trayBounds) {
@@ -68,49 +71,15 @@ function showTrayMenu(trayBounds) {
   trayMenu.setPosition(pos.x, pos.y);
   trayMenu.show();
   trayMenu.focus();
-  trayMenu.webContents.send('theme-changed', currentTheme);
+  trayMenu.webContents.send('theme-changed', themeService.get());
 }
 
 function openSettingsWindow(kind) {
-  const cfg = SETTINGS_WINDOWS[kind];
-  let w = settingsWins[kind];
-  if (w) {
-    w.show();
-    w.focus();
-    return;
-  }
-  const zoom = styleSettings ? styleSettings.zoom : 1;
-  // 居中于主窗口所在显示器；宽高随缩放等比放大，且不超出工作区
-  const area = screen.getDisplayMatching(win.getBounds()).workArea;
-  const size = settingsWindowSize(SETTINGS_WINDOW_WIDTH, cfg.height, zoom, area.width - 40, area.height - 40);
-  w = new BrowserWindow({
-    width: size.width,
-    height: size.height,
-    frame: false,
-    resizable: false,
-    skipTaskbar: false,
-    show: false,
-    icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
-    backgroundColor: currentTheme === 'dark' ? '#252525' : '#ffffff',
-    webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') },
-  });
-  settingsWins[kind] = w;
-  w.setPosition(
-    Math.round(area.x + (area.width - size.width) / 2),
-    Math.round(area.y + (area.height - size.height) / 2)
-  );
-  w.webContents.loadFile(path.join(__dirname, '..', 'renderer', cfg.dir, 'index.html'));
-  w.once('ready-to-show', () => w.show());
-  w.webContents.on('did-finish-load', () => {
-    // 设置窗口也跟随页面缩放（did-finish-load 早于首帧完成，避免闪动）
-    if (!w.isDestroyed()) w.webContents.setZoomFactor(zoom);
-    w.webContents.send('theme-changed', currentTheme);
-  });
-  w.on('closed', () => { settingsWins[kind] = null; });
+  settingsWindows.open(kind);
 }
 
 function currentCss() {
-  return readCombinedCss(DEFAULT_CSS, customCssPath)
+  return (cssProvider ? cssProvider.combined() : '')
     + '\n' + buildSettingsCss(styleSettings || {});
 }
 
@@ -134,51 +103,25 @@ function applyZoomEverywhere() {
   if (titlebarView && !titlebarView.webContents.isDestroyed()) {
     titlebarView.webContents.setZoomFactor(styleSettings.zoom);
   }
-  for (const kind of Object.keys(settingsWins)) {
-    const w = settingsWins[kind];
-    if (!w || w.isDestroyed()) continue;
-    w.webContents.setZoomFactor(styleSettings.zoom);
-    const area = screen.getDisplayMatching(w.getBounds()).workArea;
-    const size = settingsWindowSize(SETTINGS_WINDOW_WIDTH, SETTINGS_WINDOWS[kind].height, styleSettings.zoom, area.width - 40, area.height - 40);
-    w.setContentSize(size.width, size.height);
-  }
+  if (settingsWindows) settingsWindows.applyZoom();
   layoutViews();
 }
+
+// 缩放快捷键每按 1% 都会触发：落盘防抖合并（应用缩放本身即时，不落盘延迟）
+const persistSettingsSoon = debounce(() => {
+  if (settingsFile && styleSettings) saveSettings(settingsFile, styleSettings);
+}, 400);
 
 function adjustZoom(delta) {
   if (!styleSettings) return;
   styleSettings.zoom = clampZoom(Math.round((styleSettings.zoom + delta) * 100) / 100);
-  if (settingsFile) saveSettings(settingsFile, styleSettings);
+  persistSettingsSoon();
   applyZoomEverywhere();
 }
 
-// 全局快捷键：toggleWindow 必须在窗口隐藏时也能唤回，故用 globalShortcut
-function registerHotkeys() {
-  globalShortcut.unregisterAll();
-  const h = styleSettings ? styleSettings.hotkeys : null;
-  if (h) {
-    const bind = (combo, fn) => {
-      try { globalShortcut.register(comboToAccelerator(combo), fn); } catch { /* 非法组合直接忽略 */ }
-    };
-    bind(h.zoomIn, () => adjustZoom(0.01));
-    bind(h.zoomOut, () => adjustZoom(-0.01));
-    bind(h.toggleWindow, () => { if (win.isVisible()) { win.hide(); } else { win.show(); } });
-  }
-  registerTabSwitchKeys();
-}
-
-// Ctrl+Tab 和 Ctrl+PageDown/PageUp 都是 Chromium 保留键，到不了 before-input-event（菜单加速器同理）；
-// 只能在主窗口聚焦期间注册为全局快捷键，失焦即注销，不影响其他应用
-function registerTabSwitchKeys() {
-  if (!win || !win.isFocused() || !tabs) return;
-  try { globalShortcut.register('CommandOrControl+PageDown', () => tabs.nextTab()); } catch { /* 已注册则忽略 */ }
-  try { globalShortcut.register('CommandOrControl+Shift+PageUp', () => tabs.prevTab()); } catch { /* 已注册则忽略 */ }
-}
-
-function unregisterTabSwitchKeys() {
-  try { globalShortcut.unregister('CommandOrControl+PageDown'); } catch { /* 未注册则忽略 */ }
-  try { globalShortcut.unregister('CommandOrControl+Shift+PageUp'); } catch { /* 未注册则忽略 */ }
-}
+// 全局快捷键归 hotkey-service（toggleWindow 须在窗口隐藏时也能唤回，故用 globalShortcut）；
+// 标签切换键仅聚焦期注册由服务内部处理
+let hotkeys = null;
 
 function layoutViews() {
   const { width, height } = win.getContentBounds();
@@ -203,7 +146,7 @@ function createWindow() {
     minHeight: 480,
     frame: false,
     icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
-    backgroundColor: currentTheme === 'dark' ? '#191919' : '#ffffff',
+    backgroundColor: themeService.get() === 'dark' ? '#191919' : '#ffffff',
   });
 
   titlebarView = new WebContentsView({
@@ -217,7 +160,7 @@ function createWindow() {
   // 标题栏加载完成后补发一次当前主题与标签状态，消除「消息先于监听注册」的竞态
   titlebarView.webContents.on('did-finish-load', () => {
     titlebarView.webContents.setZoomFactor(styleSettings ? styleSettings.zoom : 1);
-    titlebarView.webContents.send('theme-changed', currentTheme);
+    titlebarView.webContents.send('theme-changed', themeService.get());
     titlebarView.webContents.send('window-maximized', win.isMaximized());
     // 顶栏动作区初始按可用渲染，真实状态随首次导航的 pushTopbarState 到达
     titlebarView.webContents.send('topbar-state', { available: true, favorited: null });
@@ -228,6 +171,7 @@ function createWindow() {
 
   win.on('resize', layoutViews);
   trackWindow(win, stateFile);
+  perf.mark('window-created');
 
   win.on('maximize', () => titlebarView.webContents.send('window-maximized', true));
   win.on('unmaximize', () => titlebarView.webContents.send('window-maximized', false));
@@ -244,19 +188,54 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  perf.mark('app-ready');
   Menu.setApplicationMenu(null);
   settingsFile = path.join(app.getPath('userData'), 'style-settings.json');
   styleSettings = loadSettings(settingsFile);
   // 主题持久化优先于系统主题：混合模式系统（深色任务栏+浅色应用）下
-  // shouldUseDarkColors 拿到的是浅色，会白标题栏数秒直到 Notion 上报
+  // shouldUseDarkColors 拿到的是浅色，会白标题栏数秒直到 Notion 上报。
+  // 宽限期/落盘/广播全部归 theme-service
   themeFile = path.join(app.getPath('userData'), 'theme.json');
-  currentTheme = loadTheme(themeFile) || currentTheme;
-  bootedAt = Date.now();
+  themeService = createThemeService({
+    themeFile,
+    initial: loadTheme(themeFile) || (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
+    onApplied: (theme) => {
+      broadcastTheme(theme);
+      if (win) win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
+      if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
+    },
+  });
+  // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）
+  settingsWindows = createSettingsWindows({
+    baseWidth: 340,
+    configs: {
+      style: { height: 380, dir: 'style-settings' },
+      app: { height: 440, dir: 'app-settings' },
+    },
+    getZoom: () => (styleSettings ? styleSettings.zoom : 1),
+    getTheme: () => themeService.get(),
+    getAnchorBounds: () => win.getBounds(),
+    isQuitting: () => isQuitting,
+  });
   const tabsFile = path.join(app.getPath('userData'), 'tabs.json');
   createWindow();
-  registerHotkeys();
+  hotkeys = createHotkeys({
+    globalShortcut,
+    comboToAccelerator,
+    isFocused: () => win.isFocused(),
+    getCombos: () => (styleSettings ? styleSettings.hotkeys : null),
+    actions: {
+      zoomIn: () => adjustZoom(0.01),
+      zoomOut: () => adjustZoom(-0.01),
+      toggleWindow: () => { if (win.isVisible()) { win.hide(); } else { win.show(); } },
+      nextTab: () => { if (tabs) tabs.nextTab(); },
+      prevTab: () => { if (tabs) tabs.prevTab(); },
+    },
+  });
+  hotkeys.registerAll();
 
   customCssPath = ensureCustomCss(app.getPath('userData'), DEFAULT_CSS);
+  cssProvider = createCssProvider(DEFAULT_CSS, customCssPath);
 
   // 标签状态变化 → 推送标题栏渲染 + 防抖持久化
   let saveTimer = null;
@@ -270,7 +249,7 @@ app.whenReady().then(() => {
     getTitlebarHeight: titlebarHeightNow,
     getCss: currentCss,
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
-    getTheme: () => currentTheme,
+    getTheme: () => themeService.get(),
     getSlashCommands: () => (styleSettings ? styleSettings.slashCommands : []),
     onPageFont: (font) => {
       if (titlebarView && !titlebarView.webContents.isDestroyed()) {
@@ -293,12 +272,17 @@ app.whenReady().then(() => {
     saveFile: tabsFile,
   });
   if (!tabs.restore()) tabs.newTab(NOTION_URL);
+  const firstView = tabs.activeView();
+  if (firstView) {
+    firstView.webContents.once('dom-ready', () => perf.mark('first-view-dom-ready'));
+    firstView.webContents.once('did-finish-load', () => perf.mark('first-view-loaded'));
+  }
 
-  win.on('focus', registerTabSwitchKeys);
-  win.on('blur', unregisterTabSwitchKeys);
-  registerTabSwitchKeys();
+  win.on('focus', () => hotkeys.registerTabSwitch());
+  win.on('blur', () => hotkeys.unregisterTabSwitch());
+  hotkeys.registerTabSwitch();
 
-  watchCustomCss(customCssPath, () => { applyViewSettings(); });
+  watchCustomCss(customCssPath, () => { cssProvider.invalidate(); applyViewSettings(); });
   console.log('自定义样式文件:', customCssPath);
 
   tray = new Tray(path.join(__dirname, '..', '..', 'assets', 'tray.png'));
@@ -330,7 +314,7 @@ app.whenReady().then(() => {
     styleSettings = sanitizeSettings(raw);
     saveSettings(settingsFile, styleSettings);
     applyViewSettings();
-    registerHotkeys();
+    hotkeys.registerAll();
     if (titlebarView && !titlebarView.webContents.isDestroyed()) {
       titlebarView.webContents.send('style-changed', styleSettings);
     }
@@ -362,18 +346,8 @@ app.whenReady().then(() => {
   ipcMain.on('window-minimize', () => win.minimize());
   ipcMain.on('window-toggle-maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
   ipcMain.on('window-close', () => win.close());
-  ipcMain.on('get-theme', (e) => { e.returnValue = currentTheme; });
-  ipcMain.on('notion-theme-changed', (_e, theme) => {
-    if (theme !== 'dark' && theme !== 'light') return;
-    // 启动宽限期：Notion 账户主题要等 JS 就绪后才打上 dark class，此前探测恒为 light。
-    // 持久化为 dark 时的早期 light 上报是假象，直接忽略，否则标题栏白闪 + theme.json 被污染
-    if (theme === 'light' && currentTheme === 'dark' && Date.now() - bootedAt < 15000) return;
-    currentTheme = theme;
-    if (themeFile) saveTheme(themeFile, theme); // 持久化，下次启动即知主题
-    broadcastTheme(theme);
-    win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
-    if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
-  });
+  ipcMain.on('get-theme', (e) => { e.returnValue = themeService.get(); });
+  ipcMain.on('notion-theme-changed', (_e, theme) => { themeService.report(theme); });
 });
 
 app.on('before-quit', () => { isQuitting = true; });

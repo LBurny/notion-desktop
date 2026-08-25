@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { ensureCustomCss, readCombinedCss, watchCustomCss } = require('../src/main/css-manager');
+const { ensureCustomCss, readCombinedCss, watchCustomCss, createCssProvider } = require('../src/main/css-manager');
 
 function tmpDir() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'nd-'));
@@ -54,4 +54,18 @@ test('watchCustomCss 修改文件触发回调（防抖）', async () => {
   await new Promise((r) => setTimeout(r, 500));
   w.close();
   assert.ok(calls >= 1);
+});
+
+test('createCssProvider 缓存合并结果，invalidate 后重读', () => {
+  const dir = tmpDir();
+  const def = path.join(dir, 'default.css');
+  const custom = path.join(dir, 'custom.css');
+  fs.writeFileSync(def, 'a{}');
+  fs.writeFileSync(custom, 'b{}');
+  const p = createCssProvider(def, custom);
+  assert.strictEqual(p.combined(), 'a{}\nb{}');
+  fs.writeFileSync(custom, 'c{}');
+  assert.strictEqual(p.combined(), 'a{}\nb{}'); // 缓存命中，不重读
+  p.invalidate();
+  assert.strictEqual(p.combined(), 'a{}\nc{}');
 });
