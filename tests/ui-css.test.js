@@ -91,10 +91,10 @@ test('子窗口共享样式 #form 可滚动（内容超出窗口时底部可达�
 test('.section 分区样式归共享表；样式页与设置页同风格分段', () => {
   assert.ok(/\.section\s*\{[^}]*border-top:\s*1px\s+solid\s+var\(--border\)/.test(BASE_WIN_CSS), '.section 缺顶部分隔线');
   assert.ok(/\.section\.first\s*\{[^}]*border-top:\s*0/.test(BASE_WIN_CSS), '.section.first 应无分隔线');
-  assert.ok(/class="section first">字体</.test(STYLE_SETTINGS_HTML), '样式页缺「字体」首区');
-  assert.ok(/class="section">版式</.test(STYLE_SETTINGS_HTML), '样式页缺「版式」分区');
-  assert.ok(/class="section">其他</.test(STYLE_SETTINGS_HTML), '样式页缺「其他」分区');
-  assert.ok(/class="section first">快捷键</.test(APP_SETTINGS_HTML), '设置页缺「快捷键」首区');
+  assert.ok(/class="section first"[^>]*>字体</.test(STYLE_SETTINGS_HTML), '样式页缺「字体」首区');
+  assert.ok(/class="section"[^>]*>版式</.test(STYLE_SETTINGS_HTML), '样式页缺「版式」分区');
+  assert.ok(/class="section"[^>]*>其他</.test(STYLE_SETTINGS_HTML), '样式页缺「其他」分区');
+  assert.ok(/class="section first"[^>]*>快捷键</.test(APP_SETTINGS_HTML), '设置页缺「快捷键」首区');
 });
 
 // ── 标题栏排版一致性：按钮族同宽、顶栏动作与窗口控制之间有主题色分隔线 ──

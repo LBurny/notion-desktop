@@ -17,6 +17,14 @@ window.titlebarApi.onMaximized((isMax) => {
 // fonts.ui 设置注入的效果），探测值未到时用设置页的界面字体字段兜底
 let uiFont = '';
 let lastStyle = null;
+// 界面语言随设置到达（getStyle 初始 + onStyle 更新），tooltip 与标签内文案即时切换
+let lang = 'zh-CN';
+const tr = (k) => window.i18n.t(lang, k); // 命名避让：renderTabs 循环变量用 t 表示标签对象
+function applyLang() {
+  lang = window.i18n.resolveLanguage(lastStyle && lastStyle.language, window.titlebarApi.systemLocale());
+  document.documentElement.lang = lang;
+  window.i18n.applyLanguage(document, lang);
+}
 function applyTitleFont() {
   const ui = lastStyle && lastStyle.fonts && typeof lastStyle.fonts.ui === 'string' ? lastStyle.fonts.ui : '';
   document.body.style.fontFamily = window.titleFont.titlebarFontFamily(uiFont, ui);
@@ -28,7 +36,13 @@ function applyDivider() {
 function applyStyle() { applyTitleFont(); applyDivider(); }
 lastStyle = window.titlebarApi.getStyle();
 applyStyle();
-window.titlebarApi.onStyle((s) => { lastStyle = s; applyStyle(); });
+applyLang();
+window.titlebarApi.onStyle((s) => {
+  const langChanged = window.i18n.resolveLanguage(s && s.language, window.titlebarApi.systemLocale()) !== lang;
+  lastStyle = s;
+  applyStyle();
+  if (langChanged) { applyLang(); renderTabs(); } // 语言变了才重渲染（标签内文案随语言）
+});
 window.titlebarApi.onUiFont((f) => { uiFont = f; applyTitleFont(); });
 
 // ---------- 标签条 ----------
@@ -48,8 +62,8 @@ function renderTabs() {
     const el = document.createElement('div');
     el.className = 'tab' + (t.active ? ' active' : '');
     el.dataset.id = t.id;
-    el.innerHTML = '<span class="tab-title"></span><button class="tab-close" title="关闭 (Ctrl+W)">&#10005;</button>';
-    el.querySelector('.tab-title').textContent = t.title || '加载中…';
+    el.innerHTML = `<span class="tab-title"></span><button class="tab-close" title="${tr('titlebar.closeTab')}">&#10005;</button>`;
+    el.querySelector('.tab-title').textContent = t.title || tr('titlebar.loading');
     el.addEventListener('click', (e) => {
       if (suppressClick || e.target.classList.contains('tab-close')) return;
       window.tabsApi.activate(t.id);

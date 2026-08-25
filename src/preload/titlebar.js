@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('titlebarApi', {
   getStyle: () => ipcRenderer.sendSync('get-style-settings'),
   onStyle: (cb) => ipcRenderer.on('style-changed', (_e, s) => cb(s)),
   onUiFont: (cb) => ipcRenderer.on('ui-font-changed', (_e, font) => cb(font)),
+  systemLocale: () => ipcRenderer.sendSync('system-locale'),
 });
 
 contextBridge.exposeInMainWorld('tabsApi', {

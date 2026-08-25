@@ -29,7 +29,7 @@ test('saveSettings + loadSettings 往返一致', () => {
     lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.05, hideHelp: true,
     dividerWidth: 2.5, align: 'center',
     hotkeys: { zoomIn: 'Ctrl+Alt+Q', zoomOut: 'Ctrl+Alt+W', toggleWindow: 'Ctrl+Alt+E' },
-    closeAction: 'quit',
+    closeAction: 'quit', language: 'en', launchAtLogin: true,
     slashCommands: [{ combo: 'Ctrl+Shift+R', command: 'math' }],
   };
   saveSettings(f, s);
@@ -228,6 +228,27 @@ test('sanitizeSettings fonts 返回值不共享 DEFAULT_SETTINGS 引用', () => 
   const s = sanitizeSettings(null);
   s.fonts.body = 'X';
   assert.strictEqual(DEFAULT_SETTINGS.fonts.body, '');
+});
+
+// ── 界面语言（language）与开机静默启动（launchAtLogin） ──
+
+test('sanitizeSettings language：合法值直通，非法/缺失回落 auto（跟随系统）', () => {
+  assert.strictEqual(DEFAULT_SETTINGS.language, 'auto');
+  assert.strictEqual(sanitizeSettings(null).language, 'auto');
+  assert.strictEqual(sanitizeSettings({ language: 'zh-CN' }).language, 'zh-CN');
+  assert.strictEqual(sanitizeSettings({ language: 'en' }).language, 'en');
+  assert.strictEqual(sanitizeSettings({ language: 'auto' }).language, 'auto');
+  assert.strictEqual(sanitizeSettings({ language: 'fr' }).language, 'auto'); // 不支持的语言当 auto
+  assert.strictEqual(sanitizeSettings({ language: 1 }).language, 'auto');
+});
+
+test('sanitizeSettings launchAtLogin：布尔直通，非布尔/缺失回落 false', () => {
+  assert.strictEqual(DEFAULT_SETTINGS.launchAtLogin, false);
+  assert.strictEqual(sanitizeSettings(null).launchAtLogin, false);
+  assert.strictEqual(sanitizeSettings({ launchAtLogin: true }).launchAtLogin, true);
+  assert.strictEqual(sanitizeSettings({ launchAtLogin: false }).launchAtLogin, false);
+  assert.strictEqual(sanitizeSettings({ launchAtLogin: 1 }).launchAtLogin, false);
+  assert.strictEqual(sanitizeSettings({ launchAtLogin: 'yes' }).launchAtLogin, false);
 });
 
 test('buildSettingsCss 界面槽留空用内置默认栈（不跟随正文），填入后独立', () => {

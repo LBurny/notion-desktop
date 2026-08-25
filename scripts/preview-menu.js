@@ -9,7 +9,7 @@ const { sanitizeSettings } = require('../src/main/style-settings');
 const TARGETS = {
   menu: { width: 150, height: 160, dir: 'tray-menu', preload: 'tray-menu.js' },
   style: { width: 400, height: 585, dir: 'style-settings', preload: 'settings.js' },
-  settings: { width: 400, height: 440, dir: 'app-settings', preload: 'settings.js' },
+  settings: { width: 400, height: 595, dir: 'app-settings', preload: 'settings.js' },
   tabs: { width: 900, height: 36, dir: 'titlebar', preload: 'titlebar.js' },
 };
 
@@ -18,7 +18,7 @@ const DEMO_SETTINGS = {
   lineHeight: 1.73, paragraphSpacing: 4, zoom: 1.05, hideHelp: true, dividerWidth: 1.5, align: 'justify',
   hotkeys: { zoomIn: 'Ctrl+Shift+=', zoomOut: 'Ctrl+Shift+-', toggleWindow: 'Ctrl+`' },
   slashCommands: [{ combo: 'Ctrl+Shift+M', command: 'math' }, { combo: 'Ctrl+Shift+D', command: 'divider' }],
-  closeAction: 'tray',
+  closeAction: 'tray', language: 'auto', launchAtLogin: false,
 };
 
 const DEMO_TABS = [
@@ -29,6 +29,8 @@ const DEMO_TABS = [
 
 const name = process.argv[2] || 'menu';
 const target = TARGETS[name] || TARGETS.menu;
+// 第三参数可指定界面语言（如 `settings en` 渲染英文界面），默认 auto（随下方 zh-CN 桩）
+if (['auto', 'zh-CN', 'en'].includes(process.argv[3])) DEMO_SETTINGS.language = process.argv[3];
 
 app.whenReady().then(async () => {
   let theme = 'light';
@@ -36,6 +38,7 @@ app.whenReady().then(async () => {
   ipcMain.on('tray-menu-action', () => {});
   ipcMain.on('get-style-settings', (e) => { e.returnValue = sanitizeSettings(DEMO_SETTINGS); });
   ipcMain.on('system-fonts', (e) => { e.returnValue = listSystemFonts(); });
+  ipcMain.on('system-locale', (e) => { e.returnValue = 'zh-CN'; });
   ipcMain.handle('style-settings-update', () => true);
   ipcMain.on('settings-close', () => {});
   // 标题栏（标签条）场景的通道桩
@@ -64,7 +67,9 @@ app.whenReady().then(async () => {
       await new Promise((r) => setTimeout(r, 200));
     }
     const img = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(__dirname, '..', '.playwright-mcp', `${name}-${t}.png`), img.toPNG());
+    // 指定语言时文件名带语言后缀（settings-en-dark.png），避免覆盖默认中文产物
+    const outName = name + (DEMO_SETTINGS.language === 'auto' ? '' : '-' + DEMO_SETTINGS.language);
+    fs.writeFileSync(path.join(__dirname, '..', '.playwright-mcp', `${outName}-${t}.png`), img.toPNG());
     console.log('written', t);
   }
   // 标签条追加溢出场景：10 个长标题标签 + 禁用加号

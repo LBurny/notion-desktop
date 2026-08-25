@@ -11,81 +11,82 @@
   <!-- #win：圆角/背景由它绘制（body 背景会传播到根画布顶掉圆角，参考托盘菜单 #menu 结构） -->
   <div id="win">
     <div id="titlebar">
-      <span>样式</span>
-      <button id="close" title="关闭">&#10005;</button>
+      <span data-i18n="style.title">样式</span>
+      <button id="close" data-i18n-title="common.close" title="关闭">&#10005;</button>
     </div>
     <div id="form">
-      <div class="section first">字体</div>
+      <div class="section first" data-i18n="style.fonts">字体</div>
       <label class="row">
-        <span class="name">正文字体</span>
+        <span class="name" data-i18n="style.bodyFont">正文字体</span>
         <div class="font-combo">
           <input id="font-body" type="text" placeholder="默认：思源宋体 CN" autocomplete="off" spellcheck="false" />
-          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <button class="font-toggle" type="button" tabindex="-1" data-i18n-title="style.fontToggleTitle" title="选择字体">▾</button>
           <ul class="font-options" hidden></ul>
         </div>
       </label>
       <label class="row">
-        <span class="name">界面字体</span>
+        <span class="name" data-i18n="style.uiFont">界面字体</span>
         <div class="font-combo">
           <input id="font-ui" type="text" placeholder="默认：思源宋体 CN" autocomplete="off" spellcheck="false" />
-          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <button class="font-toggle" type="button" tabindex="-1" data-i18n-title="style.fontToggleTitle" title="选择字体">▾</button>
           <ul class="font-options" hidden></ul>
         </div>
       </label>
       <label class="row">
-        <span class="name">代码字体</span>
+        <span class="name" data-i18n="style.codeFont">代码字体</span>
         <div class="font-combo">
           <input id="font-code" type="text" placeholder="默认：Consolas" autocomplete="off" spellcheck="false" />
-          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <button class="font-toggle" type="button" tabindex="-1" data-i18n-title="style.fontToggleTitle" title="选择字体">▾</button>
           <ul class="font-options" hidden></ul>
         </div>
       </label>
       <label class="row">
-        <span class="name">公式字体</span>
+        <span class="name" data-i18n="style.mathFont">公式字体</span>
         <div class="font-combo">
           <input id="font-math" type="text" placeholder="默认：KaTeX_Main" autocomplete="off" spellcheck="false" />
-          <button class="font-toggle" type="button" tabindex="-1" title="选择字体">▾</button>
+          <button class="font-toggle" type="button" tabindex="-1" data-i18n-title="style.fontToggleTitle" title="选择字体">▾</button>
           <ul class="font-options" hidden></ul>
         </div>
       </label>
-      <div class="section">版式</div>
+      <div class="section" data-i18n="style.layout">版式</div>
       <label class="row">
-        <span class="name">行间距</span>
+        <span class="name" data-i18n="style.lineHeight">行间距</span>
         <input id="lineHeight" type="number" min="1" max="3" step="0.01" />
       </label>
       <label class="row">
-        <span class="name">段落间距 (px)</span>
+        <span class="name" data-i18n="style.paragraphSpacing">段落间距 (px)</span>
         <input id="paragraphSpacing" type="number" min="0" max="30" step="1" />
       </label>
       <label class="row">
-        <span class="name">分割线粗细 (px)</span>
+        <span class="name" data-i18n="style.dividerWidth">分割线粗细 (px)</span>
         <input id="dividerWidth" type="number" min="0" max="4" step="0.5" />
       </label>
       <div class="row">
-        <span class="name">文字对齐</span>
-        <div id="align-group">
-          <label><input type="radio" name="align" value="justify" />两端对齐</label>
-          <label><input type="radio" name="align" value="left" />靠左</label>
-          <label><input type="radio" name="align" value="right" />靠右</label>
-          <label><input type="radio" name="align" value="center" />居中</label>
+        <span class="name" data-i18n="style.align">文字对齐</span>
+        <div id="align-group" class="segmented">
+          <label><input type="radio" name="align" value="justify" /><span data-i18n="style.alignJustify">两端对齐</span></label>
+          <label><input type="radio" name="align" value="left" /><span data-i18n="style.alignLeft">靠左</span></label>
+          <label><input type="radio" name="align" value="right" /><span data-i18n="style.alignRight">靠右</span></label>
+          <label><input type="radio" name="align" value="center" /><span data-i18n="style.alignCenter">居中</span></label>
         </div>
       </div>
       <div class="row">
-        <span class="name">页面缩放</span>
+        <span class="name" data-i18n="style.zoom">页面缩放</span>
         <div id="zoom-group">
-          <button id="zoom-out" title="缩小 1%">&#8722;</button>
+          <button id="zoom-out" data-i18n-title="style.zoomOutTitle" title="缩小 1%">&#8722;</button>
           <span id="zoom-label">100%</span>
-          <button id="zoom-in" title="放大 1%">&#43;</button>
+          <button id="zoom-in" data-i18n-title="style.zoomInTitle" title="放大 1%">&#43;</button>
         </div>
       </div>
-      <div class="section">其他</div>
+      <div class="section" data-i18n="style.misc">其他</div>
       <label class="row check">
         <input id="hideHelp" type="checkbox" />
-        <span>屏蔽右下角帮助按钮</span>
+        <span data-i18n="style.hideHelp">屏蔽右下角帮助按钮</span>
       </label>
       <p id="hint"></p>
     </div>
   </div>
+  <script src="../shared/i18n.js"></script>
   <script src="font-detect.js"></script>
   <script src="settings.js"></script>
 </body>

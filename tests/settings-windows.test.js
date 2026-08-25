@@ -76,9 +76,10 @@ function setup({ zoom = 1, theme = 'dark', quitting = false } = {}) {
   const state = { zoom, theme, quitting };
   const svc = createSettingsWindows({
     baseWidth: 400,
-    configs: { style: { height: 585, dir: 'style-settings' }, app: { height: 440, dir: 'app-settings' } },
+    configs: { style: { height: 585, dir: 'style-settings' }, app: { height: 595, dir: 'app-settings' } },
     getZoom: () => state.zoom,
     getTheme: () => state.theme,
+    getLanguage: () => state.lang || 'zh-CN',
     getAnchorBounds: () => ({ x: 0, y: 0, width: 1200, height: 800 }),
     isQuitting: () => state.quitting,
   });
@@ -101,14 +102,27 @@ test('open 创建窗口：尺寸随缩放、居中、就绪后 zoom+theme', () =
   assert.equal(w.shown, 1);
   w.emitWc('did-finish-load');
   assert.equal(w.zoom, 1);
-  assert.deepEqual(w.sent, [['theme-changed', 'dark']]);
+  // 首帧主题与语言一并下发（页面启动即收，消除「消息先于监听注册」竞态）
+  assert.deepEqual(w.sent, [['theme-changed', 'dark'], ['language-changed', 'zh-CN']]);
+});
+
+test('broadcastLanguage：给所有存活窗口发 language-changed；已销毁跳过', () => {
+  const { svc, state } = setup();
+  const style = svc.open('style');
+  const appW = svc.open('app');
+  state.quitting = true;
+  appW.simulateClose(); // 销毁
+  style.sent = []; appW.sent = [];
+  svc.broadcastLanguage('en');
+  assert.deepEqual(style.sent, [['language-changed', 'en']]);
+  assert.deepEqual(appW.sent, []); // 已销毁不再发
 });
 
 test('open 两页同宽：均未单独定宽，统一回落 baseWidth 400', () => {
   const { svc } = setup();
   const w = svc.open('app');
   assert.equal(w.opts.width, 400);
-  assert.equal(w.opts.height, 440);
+  assert.equal(w.opts.height, 595); // 5 分区（含启动/语言）贴合高度
 });
 
 test('同 kind 重复 open：不新建，show+focus 复用', () => {

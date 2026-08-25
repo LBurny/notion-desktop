@@ -18,6 +18,8 @@ const { createTabs } = require('./tabs');
 const { createSettingsWindows } = require('./settings-windows');
 const { attachRequestFilter } = require('./request-filter');
 const { resolveTrayAction } = require('./tray-actions');
+const { syncLoginItem, shouldStartHidden } = require('./login-item');
+const { resolveLanguage } = require('../renderer/shared/i18n');
 
 const NOTION_URL = 'https://www.notion.so/';
 const TITLEBAR_HEIGHT = 36;
@@ -82,6 +84,12 @@ function showTrayMenu(trayBounds) {
   trayMenu.show();
   trayMenu.focus();
   trayMenu.webContents.send('theme-changed', themeService.get());
+  // 菜单缓存复用，每次弹出同步当前语言（设置里切过语言后下次弹出即生效）
+  trayMenu.webContents.send('language-changed', currentLanguage());
+}
+
+function currentLanguage() {
+  return resolveLanguage(styleSettings ? styleSettings.language : 'auto', app.getLocale());
 }
 
 function openSettingsWindow(kind) {
@@ -139,7 +147,7 @@ function layoutViews() {
   if (tabs) tabs.layout();
 }
 
-function createWindow() {
+function createWindow({ startHidden = false } = {}) {
   const stateFile = path.join(app.getPath('userData'), 'window-state.json');
   const state = loadState(stateFile);
   if (!isVisibleOnSomeDisplay(state, screen.getAllDisplays())) {
@@ -155,9 +163,11 @@ function createWindow() {
     minWidth: 640,
     minHeight: 480,
     frame: false,
+    show: false, // 显式 show：登录项静默拉起（startHidden）时主窗不弹，留在托盘
     icon: path.join(__dirname, '..', '..', 'assets', 'icon.ico'), // 多尺寸 ico：Windows 按 DPI 自选，高分屏不再发糊
     backgroundColor: themeService.get() === 'dark' ? '#191919' : '#ffffff',
   });
+  if (!startHidden) win.show();
 
   titlebarView = new WebContentsView({
     webPreferences: { preload: path.join(__dirname, '..', 'preload', 'titlebar.js') },
@@ -202,6 +212,10 @@ app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
   settingsFile = path.join(app.getPath('userData'), 'style-settings.json');
   styleSettings = loadSettings(settingsFile);
+  // 开机自启（静默到托盘）：同步注册表登录项（开发态不写，避免污染）；
+  // 本次由登录项拉起则主窗不弹，托盘/全局快捷键照常可用
+  if (app.isPackaged) syncLoginItem(app, styleSettings.launchAtLogin);
+  const startHidden = styleSettings.launchAtLogin && shouldStartHidden(app);
   // 主题持久化优先于系统主题：混合模式系统（深色任务栏+浅色应用）下
   // shouldUseDarkColors 拿到的是浅色，会白标题栏数秒直到 Notion 上报。
   // 宽限期/落盘/广播全部归 theme-service
@@ -217,21 +231,22 @@ app.whenReady().then(() => {
   });
   // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）。
   // 两页同宽 400（统一回落 baseWidth，设置页不再窄于样式页）；高度按内容贴合：
-  // 样式 585（表单 10 行+3 分区头+hint），设置 440；#form 均可滚动兜底
-  // （shared/base-win.css），新增表单行不必再调基准高度
+  // 样式 585（表单 10 行+3 分区头+hint），设置 595（5 分区含启动/语言）；
+  // #form 均可滚动兜底（shared/base-win.css），新增表单行不必再调基准高度
   settingsWindows = createSettingsWindows({
     baseWidth: 400,
     configs: {
       style: { height: 585, dir: 'style-settings' },
-      app: { height: 440, dir: 'app-settings' },
+      app: { height: 595, dir: 'app-settings' },
     },
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
     getTheme: () => themeService.get(),
+    getLanguage: currentLanguage,
     getAnchorBounds: () => win.getBounds(),
     isQuitting: () => isQuitting,
   });
   const tabsFile = path.join(app.getPath('userData'), 'tabs.json');
-  createWindow();
+  createWindow({ startHidden });
   hotkeys = createHotkeys({
     globalShortcut,
     comboToAccelerator,
@@ -317,14 +332,21 @@ app.whenReady().then(() => {
 
   ipcMain.on('get-style-settings', (e) => { e.returnValue = styleSettings; });
   ipcMain.on('system-fonts', (e) => { e.returnValue = getSystemFontsCached(); });
+  // 界面语言解析依赖系统语言（渲染页 resolveLanguage(pref, locale) 的 locale 来源）
+  ipcMain.on('system-locale', (e) => { e.returnValue = app.getLocale(); });
   ipcMain.handle('style-settings-update', (_e, raw) => {
     styleSettings = sanitizeSettings(raw);
     saveSettings(settingsFile, styleSettings);
     applyViewSettings();
     hotkeys.registerAll();
+    if (app.isPackaged) syncLoginItem(app, styleSettings.launchAtLogin);
     if (titlebarView && !titlebarView.webContents.isDestroyed()) {
-      titlebarView.webContents.send('style-changed', styleSettings);
+      titlebarView.webContents.send('style-changed', styleSettings); // 语言随设置到达，标题栏自行解析
     }
+    // 子窗口与托盘菜单的语言即时切换（标题栏走上行 style-changed）
+    const lang = currentLanguage();
+    if (settingsWindows) settingsWindows.broadcastLanguage(lang);
+    if (trayMenu && !trayMenu.isDestroyed()) trayMenu.webContents.send('language-changed', lang);
     return true;
   });
   ipcMain.on('settings-close', (e) => {

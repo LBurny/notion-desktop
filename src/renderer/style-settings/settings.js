@@ -1,10 +1,26 @@
 const $ = (id) => document.getElementById(id);
 
 let settings = window.settingsApi.get();
+// 界面语言：resolveLanguage(设置项, 系统语言)；onLanguage 收到的是主进程已解析的结果
+let lang = window.i18n.resolveLanguage(settings.language, window.settingsApi.systemLocale());
+const t = (k) => window.i18n.t(lang, k);
 
-// 公式槽内置默认随本机已装字体模糊匹配（同名文件安装名不一：Latin Modern Math /
-// Modern Math / Modern 等），占位符显示实际解析出的默认，未装 Modern 系才显示 KaTeX_Main
-$('font-math').placeholder = `默认：${window.fontDetect.pickMathDefaultFont(window.settingsApi.systemFonts()) || 'KaTeX_Main'}`;
+// 四个字体槽的占位符显示「前缀 + 内置默认名」；公式槽内置默认随本机已装字体模糊匹配
+// （同名文件安装名不一：Latin Modern Math / Modern Math / Modern 等），
+// 未装 Modern 系才显示 KaTeX_Main
+function applyPlaceholders() {
+  const prefix = t('style.defaultPrefix');
+  $('font-body').placeholder = prefix + '思源宋体 CN';
+  $('font-ui').placeholder = prefix + '思源宋体 CN';
+  $('font-code').placeholder = prefix + 'Consolas';
+  $('font-math').placeholder = prefix + (window.fontDetect.pickMathDefaultFont(window.settingsApi.systemFonts()) || 'KaTeX_Main');
+}
+
+function applyLang() {
+  document.documentElement.lang = lang;
+  window.i18n.applyLanguage(document, lang);
+  applyPlaceholders();
+}
 
 // 字体下拉：自绘可滚动列表（原生 datalist 弹层不跟主题、小窗内无法滚动）
 // 只列出系统真实安装的候选字体，每项直接用该字体渲染预览；仍可手动输入任意字体名
@@ -35,7 +51,7 @@ function setupFontCombo(inputId, onChange) {
     if (!shown.length) {
       const li = document.createElement('li');
       li.className = 'empty';
-      li.textContent = '无匹配字体';
+      li.textContent = t('style.fontEmpty');
       listEl.appendChild(li);
       return;
     }
@@ -117,7 +133,7 @@ function push() {
 let savedTimer = null;
 function showSaved() {
   const el = $('hint');
-  el.textContent = '已保存';
+  el.textContent = t('common.saved');
   el.classList.add('show');
   clearTimeout(savedTimer);
   savedTimer = setTimeout(() => el.classList.remove('show'), 1500);
@@ -167,4 +183,14 @@ window.settingsApi.onTheme((theme) => {
   document.documentElement.dataset.theme = theme;
 });
 
+// 语言广播：另一个窗口改了语言后本窗即时跟随；同时刷新本地设置快照，
+// 避免之后本窗提交把对方改过的字段（含 language 本身）写回旧值
+window.settingsApi.onLanguage((l) => {
+  settings = window.settingsApi.get();
+  lang = l;
+  applyLang();
+  render();
+});
+
+applyLang();
 render();

@@ -6,7 +6,7 @@ const { BrowserWindow, screen } = require('electron');
 const { settingsWindowSize } = require('./style-settings');
 
 function createSettingsWindows({
-  baseWidth, configs, getZoom, getTheme, getAnchorBounds, isQuitting,
+  baseWidth, configs, getZoom, getTheme, getLanguage, getAnchorBounds, isQuitting,
 }) {
   const wins = {}; // kind → BrowserWindow | null
 
@@ -49,10 +49,12 @@ function createSettingsWindows({
     w.webContents.loadFile(path.join(__dirname, '..', 'renderer', cfg.dir, 'index.html'));
     w.once('ready-to-show', () => { if (!w.isDestroyed()) w.show(); });
     w.webContents.on('did-finish-load', () => {
-      // 设置窗口也跟随页面缩放（did-finish-load 早于首帧完成，避免闪动）
+      // 设置窗口也跟随页面缩放（did-finish-load 早于首帧完成，避免闪动）；
+      // 主题与语言一并首帧下发，消除「消息先于监听注册」竞态
       if (w.isDestroyed()) return;
       w.webContents.setZoomFactor(zoom);
       w.webContents.send('theme-changed', theme);
+      w.webContents.send('language-changed', getLanguage());
     });
     // 关闭即隐藏缓存，重开免重建；退出应用时放行真正销毁
     w.on('close', (e) => {
@@ -85,6 +87,7 @@ function createSettingsWindows({
     open,
     applyZoom,
     broadcastTheme: (theme) => forEachWin((w) => w.webContents.send('theme-changed', theme)),
+    broadcastLanguage: (lang) => forEachWin((w) => w.webContents.send('language-changed', lang)),
     forEachWin,
   };
 }

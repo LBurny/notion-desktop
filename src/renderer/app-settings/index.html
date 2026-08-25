@@ -11,38 +11,52 @@
   <!-- #win：圆角/背景由它绘制（body 背景会传播到根画布顶掉圆角，参考托盘菜单 #menu 结构） -->
   <div id="win">
     <div id="titlebar">
-      <span>设置</span>
-      <button id="close" title="关闭">&#10005;</button>
+      <span data-i18n="settings.title">设置</span>
+      <button id="close" data-i18n-title="common.close" title="关闭">&#10005;</button>
     </div>
     <div id="form">
-      <div class="section first">快捷键</div>
+      <div class="section first" data-i18n="settings.hotkeys">快捷键</div>
       <label class="row">
-        <span class="name">放大页面</span>
-        <input id="hk-zoomIn" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+        <span class="name" data-i18n="settings.zoomIn">放大页面</span>
+        <input id="hk-zoomIn" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
       </label>
       <label class="row">
-        <span class="name">缩小页面</span>
-        <input id="hk-zoomOut" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+        <span class="name" data-i18n="settings.zoomOut">缩小页面</span>
+        <input id="hk-zoomOut" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
       </label>
       <label class="row">
-        <span class="name">显示 / 隐藏</span>
-        <input id="hk-toggleWindow" class="hotkey" type="text" readonly title="点击后按下新快捷键，Esc 取消" />
+        <span class="name" data-i18n="settings.toggleWindow">显示 / 隐藏</span>
+        <input id="hk-toggleWindow" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
       </label>
-      <div class="section">斜杠命令快捷键</div>
+      <div class="section" data-i18n="settings.slash">斜杠命令快捷键</div>
       <div id="slash-list"></div>
-      <div class="row"><button id="slash-add" type="button">+ 添加</button></div>
-      <div class="section">关闭窗口时</div>
+      <div class="row"><button id="slash-add" type="button" data-i18n="settings.slashAdd">+ 添加</button></div>
+      <div class="section" data-i18n="settings.closeAction">关闭窗口时</div>
       <label class="row check">
         <input id="close-tray" type="radio" name="closeAction" value="tray" />
-        <span>最小化到托盘</span>
+        <span data-i18n="settings.closeTray">最小化到托盘</span>
       </label>
       <label class="row check">
         <input id="close-quit" type="radio" name="closeAction" value="quit" />
-        <span>退出程序</span>
+        <span data-i18n="settings.closeQuit">退出程序</span>
       </label>
+      <div class="section" data-i18n="settings.launch">启动</div>
+      <label class="row check">
+        <input id="launch-at-login" type="checkbox" />
+        <span data-i18n="settings.launchAtLogin">开机时自动启动（静默到托盘）</span>
+      </label>
+      <div class="section" data-i18n="settings.language">语言</div>
+      <div class="row">
+        <div class="segmented" id="lang-group">
+          <label><input type="radio" name="language" value="auto" /><span data-i18n="settings.langAuto">跟随系统</span></label>
+          <label><input type="radio" name="language" value="zh-CN" /><span>中文</span></label>
+          <label><input type="radio" name="language" value="en" /><span>English</span></label>
+        </div>
+      </div>
       <p id="hint"></p>
     </div>
   </div>
+  <script src="../shared/i18n.js"></script>
   <script src="hotkey-capture.js"></script>
   <script src="settings.js"></script>
 </body>

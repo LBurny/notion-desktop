@@ -16,6 +16,8 @@ const DEFAULT_SETTINGS = {
     toggleWindow: 'Ctrl+`',      // 显示 / 最小化到托盘
   },
   closeAction: 'tray', // 'tray' = 最小化到托盘；'quit' = 退出程序
+  language: 'auto',    // 界面语言：'auto' 跟随系统（非 zh 系统一律英文）/ 'zh-CN' / 'en'
+  launchAtLogin: false, // 开机自动启动（静默到托盘，主窗不弹出）
   slashCommands: [{ combo: 'Ctrl+Shift+M', command: 'math' }], // 斜杠命令快捷键（前台注入 /word + Enter）。注意 Ctrl+Shift+R 是 Chromium 保留键（强制刷新），事件到不了 before-input-event，不能作默认
 };
 
@@ -86,6 +88,8 @@ function sanitizeSettings(raw) {
       }
     }
     if (raw.closeAction === 'tray' || raw.closeAction === 'quit') s.closeAction = raw.closeAction;
+    if (['auto', 'zh-CN', 'en'].includes(raw.language)) s.language = raw.language;
+    if (typeof raw.launchAtLogin === 'boolean') s.launchAtLogin = raw.launchAtLogin;
     if (Array.isArray(raw.slashCommands)) {
       const list = [];
       for (const item of raw.slashCommands) {
