@@ -114,52 +114,60 @@ window.addEventListener('keydown', (e) => {
 
 // ── 主进程探针：顶栏点击 / 收藏状态 / Quick Find 状态 / 页面字体 ──
 // 隔离世界可同步读 DOM，wc.send 往返约 1ms，取代 executeJavaScript
-//（Electron 43 上约 140ms）。选择器由主进程随消息下发（源：topbar-actions.js）；
-// 沙箱 preload 无法 require 本地模块，寻钮/判态逻辑镜像 topbar-actions.js，
-// 修改时两边同步。
-function pickFirst(root, selectors) {
+//（Electron 43 上约 140ms）。探针函数由 scripts/build-preload-probes.js 生成
+//（单一事实源：src/main/topbar-actions.js），修改后须运行 npm run sync-probes。
+// [probes:generated begin]
+// 本区块由 scripts/build-preload-probes.js 生成，勿手改。
+// 改探针逻辑请改 src/main/topbar-actions.js 后运行 npm run sync-probes
+const CONTENT_FONT_SELECTORS = [".notion-page-content","[data-testid=\"page-title\"]"];
+function pickTopbarButton(root, selectors) {
   for (const sel of selectors) {
     const el = root.querySelector(sel);
     if (el) return el;
   }
   return null;
 }
+function favoriteStateOf(root, selectors) {
+  const el = pickTopbarButton(root, selectors);
+  if (!el) return null;
+  if (el.querySelector('svg.starFill')) return true;
+  if (el.querySelector('svg.star')) return false;
+  return null;
+}
+function quickFindStateOf(root) {
+  return {
+    open: !!root.querySelector('[role="dialog"] input'),
+    anyDialog: !!root.querySelector('[role="dialog"]'),
+  };
+}
+function pageFontOf(root, getComputedStyle) {
+  for (const sel of CONTENT_FONT_SELECTORS) {
+    const el = root.querySelector(sel);
+    if (!el) continue;
+    const font = (getComputedStyle(el).fontFamily || '').trim();
+    if (font) return font;
+  }
+  return null;
+}
+// [probes:generated end]
 
 ipcRenderer.on('topbar-click', (_e, selectors) => {
   if (!Array.isArray(selectors)) return;
-  const el = pickFirst(document, selectors);
+  const el = pickTopbarButton(document, selectors);
   if (el) el.click();
 });
 
 ipcRenderer.on('topbar-favorite-query', (_e, selectors) => {
   if (!Array.isArray(selectors)) return;
-  const el = pickFirst(document, selectors);
-  let state = null;
-  if (el) {
-    if (el.querySelector('svg.starFill')) state = true;
-    else if (el.querySelector('svg.star')) state = false;
-  }
-  ipcRenderer.send('topbar-favorite-state', state);
+  ipcRenderer.send('topbar-favorite-state', favoriteStateOf(document, selectors));
 });
 
 ipcRenderer.on('quick-find-state-query', () => {
-  ipcRenderer.send('quick-find-state', {
-    open: !!document.querySelector('[role="dialog"] input'),
-    anyDialog: !!document.querySelector('[role="dialog"]'),
-  });
+  ipcRenderer.send('quick-find-state', quickFindStateOf(document));
 });
 
-ipcRenderer.on('page-font-query', (_e, selectors) => {
-  let font = null;
-  if (Array.isArray(selectors)) {
-    for (const sel of selectors) {
-      const el = document.querySelector(sel);
-      if (!el) continue;
-      const f = (window.getComputedStyle(el).fontFamily || '').trim();
-      if (f) { font = f; break; }
-    }
-  }
-  ipcRenderer.send('page-font', font);
+ipcRenderer.on('page-font-query', () => {
+  ipcRenderer.send('page-font', pageFontOf(document, window.getComputedStyle));
 });
 
 contextBridge.exposeInMainWorld('notionDesktop', {

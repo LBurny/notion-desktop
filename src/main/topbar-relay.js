@@ -1,7 +1,7 @@
 // 顶栏一体化中继：动作转发、收藏状态回读、页面字体探测。
 // 页面顶栏被 CSS 隐藏，标题栏按钮点击经 preload 在页面内点对应隐藏按钮；
 // 状态/字体读取走 preload 探针（往返约 1ms；executeJavaScript 约 140ms 已弃用）
-const { TOPBAR_ACTIONS, CONTENT_FONT_SELECTORS } = require('./topbar-actions');
+const { TOPBAR_ACTIONS } = require('./topbar-actions');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -43,7 +43,7 @@ function createTopbarRelay({
   async function probePageFont(rec, attempt = 0) {
     const wc = rec.view && rec.view.webContents;
     if (!wc || wc.isDestroyed() || wc.getURL().startsWith('file://')) return;
-    const font = await queryWc(wc, 'page-font-query', CONTENT_FONT_SELECTORS, 'page-font');
+    const font = await queryWc(wc, 'page-font-query', null, 'page-font');
     if (typeof font === 'string' && font.trim()) {
       if (onPageFont) onPageFont(font);
       return;

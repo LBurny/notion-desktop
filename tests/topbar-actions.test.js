@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const {
-  TOPBAR_ACTIONS, pickTopbarButton, buildClickScript, buildFavoriteStateScript,
+  TOPBAR_ACTIONS, pickTopbarButton,
   favoriteStateOf, quickFindStateOf, pageFontOf, CONTENT_FONT_SELECTORS,
 } = require('../src/main/topbar-actions');
 
@@ -23,48 +23,12 @@ test('pickTopbarButton 按优先级返回第一个命中', () => {
   assert.strictEqual(pickTopbarButton(stubDoc({}), ['.a']), null);
 });
 
-test('buildClickScript 命中时点击并返回 true，未命中返回 false', () => {
-  let clicked = 0;
-  const el = { click: () => { clicked++; } };
-  const script = buildClickScript('share');
-  const run = new Function('document', `return ${script}`);
-  assert.strictEqual(run(stubDoc({ [TOPBAR_ACTIONS.share.selectors[0]]: el })), true);
-  assert.strictEqual(clicked, 1);
-  assert.strictEqual(run(stubDoc({})), false);
-});
-
-test('buildClickScript 对未知动作抛错', () => {
-  assert.throws(() => buildClickScript('nope'));
-});
-
 test('sidebar 动作是开关：开态下有收起按钮可点（选择器表含 Close sidebar）', () => {
-  // 开态：前几个“打开”选择器全部落空，必须落到收起按钮
   const closeSel = TOPBAR_ACTIONS.sidebar.selectors.find((s) => s.includes('Close sidebar'));
   assert.ok(closeSel, 'sidebar 选择器表缺少收起按钮');
-  let clicked = 0;
-  const el = { click: () => { clicked++; } };
-  const run = new Function('document', `return ${buildClickScript('sidebar')}`);
-  assert.strictEqual(run(stubDoc({ [closeSel]: el })), true);
-  assert.strictEqual(clicked, 1);
 });
 
-test('buildFavoriteStateScript 按 svg.starFill/star 判态，按钮缺失返回 null', () => {
-  const script = buildFavoriteStateScript();
-  const run = new Function('document', `return ${script}`);
-  const favBtn = (svgCls) => ({
-    querySelector: (sel) => (sel === 'svg.starFill' && svgCls === 'starFill') || (sel === 'svg.star' && svgCls === 'star') ? {} : null,
-  });
-  const key = TOPBAR_ACTIONS.favorite.selectors[0];
-  assert.strictEqual(run(stubDoc({ [key]: favBtn('starFill') })), true);
-  assert.strictEqual(run(stubDoc({ [key]: favBtn('star') })), false);
-  assert.strictEqual(run(stubDoc({ [key]: favBtn('other') })), null);
-  assert.strictEqual(run(stubDoc({})), null);
-});
-
-// ── preload 内联探针的同源纯函数（沙箱 preload 无法 require 本地模块，
-//    content.js 里的实现镜像这里的逻辑，务必同步修改） ──
-
-test('favoriteStateOf 与 buildFavoriteStateScript 判态一致', () => {
+test('favoriteStateOf 按 svg.starFill/star 判态，按钮缺失返回 null', () => {
   const favBtn = (svgCls) => ({
     querySelector: (sel) => (sel === 'svg.starFill' && svgCls === 'starFill') || (sel === 'svg.star' && svgCls === 'star') ? {} : null,
   });

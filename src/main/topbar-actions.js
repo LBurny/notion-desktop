@@ -9,7 +9,11 @@ const TOPBAR_ACTIONS = {
   more:     { selectors: ['.notion-topbar-more-button', '.notion-topbar [aria-label="Actions"]'] },
 };
 
-// 注入页面执行，必须自包含（不得引用模块作用域）
+// 探针纯函数：单一事实源。沙箱 preload 无法 require 本地模块，
+// content.js 里的同名函数由 scripts/build-preload-probes.js 从此内联生成，
+// 修改后运行 npm run sync-probes（tests/probe-sync.test.js 保新鲜）。
+
+// 寻钮：按优先级返回第一个命中（aria-label 随界面语言变化，所以多级兜底）
 function pickTopbarButton(root, selectors) {
   for (const sel of selectors) {
     const el = root.querySelector(sel);
@@ -18,35 +22,7 @@ function pickTopbarButton(root, selectors) {
   return null;
 }
 
-function buildClickScript(action) {
-  const cfg = TOPBAR_ACTIONS[action];
-  if (!cfg) throw new Error('unknown topbar action: ' + action);
-  return `(() => {
-    const el = (${pickTopbarButton.toString()})(document, ${JSON.stringify(cfg.selectors)});
-    if (!el) return false;
-    el.click();
-    return true;
-  })()`;
-}
-
 // 收藏状态：svg.starFill = 已收藏，svg.star = 未收藏（侦察确认，语言无关）
-function buildFavoriteStateScript() {
-  const sels = JSON.stringify(TOPBAR_ACTIONS.favorite.selectors);
-  return `(() => {
-    const el = (${pickTopbarButton.toString()})(document, ${sels});
-    if (!el) return null;
-    if (el.querySelector('svg.starFill')) return true;
-    if (el.querySelector('svg.star')) return false;
-    return null;
-  })()`;
-}
-
-// ── preload 探针的同源纯函数 ──
-// 顶栏点击/状态读取已改走 preload IPC（executeJavaScript 在 Electron 43 上
-// 往返约 140ms，preload IPC 约 1ms）。沙箱 preload 无法 require 本地模块，
-// src/preload/content.js 里的实现镜像以下函数，修改时两边必须同步。
-
-// 与 buildFavoriteStateScript 相同的判态逻辑（直接函数版）
 function favoriteStateOf(root, selectors) {
   const el = pickTopbarButton(root, selectors);
   if (!el) return null;
@@ -80,6 +56,6 @@ function pageFontOf(root, getComputedStyle) {
 }
 
 module.exports = {
-  TOPBAR_ACTIONS, pickTopbarButton, buildClickScript, buildFavoriteStateScript,
-  favoriteStateOf, quickFindStateOf, pageFontOf, CONTENT_FONT_SELECTORS,
+  TOPBAR_ACTIONS, pickTopbarButton, favoriteStateOf, quickFindStateOf,
+  pageFontOf, CONTENT_FONT_SELECTORS,
 };
