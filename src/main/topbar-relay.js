@@ -12,7 +12,8 @@ function createTopbarRelay({
   async function topbarAction(action) {
     const wc = getActiveWc();
     if (!wc) { schedulePush(); return; }
-    try { wc.send('topbar-click', TOPBAR_ACTIONS[action].selectors); } catch { /* 视图销毁则忽略 */ }
+    // 只发动作名：选择器表/开关重试逻辑在 preload 探针区（生成自 topbar-actions.js）
+    try { wc.send('topbar-click', action); } catch { /* 视图销毁则忽略 */ }
     if (action === 'favorite') setTimeout(pushNow, favoriteSettleMs); // 等 Notion 落状态再回读
   }
 

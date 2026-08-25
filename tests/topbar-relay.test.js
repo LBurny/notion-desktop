@@ -38,7 +38,7 @@ test('topbarAction(favorite)：转发点击并在 Notion 落状态后回读收�
   const wc = makeWc({ favorite: true });
   const { relay, states } = setup(wc);
   relay.topbarAction('favorite');
-  assert.deepEqual(wc.log, [['topbar-click', TOPBAR_ACTIONS.favorite.selectors]]);
+  assert.deepEqual(wc.log, [['topbar-click', 'favorite']]);
   await new Promise((r) => setTimeout(r, 50)); // favoriteSettleMs(20) 后回读
   assert.deepEqual(states, [{ available: true, favorited: true }]);
 });
@@ -47,7 +47,7 @@ test('topbarAction 非 favorite 动作不回读', async () => {
   const wc = makeWc();
   const { relay, states } = setup(wc);
   relay.topbarAction('sidebar');
-  assert.deepEqual(wc.log, [['topbar-click', TOPBAR_ACTIONS.sidebar.selectors]]);
+  assert.deepEqual(wc.log, [['topbar-click', 'sidebar']]);
   await new Promise((r) => setTimeout(r, 60));
   assert.deepEqual(states, []);
 });

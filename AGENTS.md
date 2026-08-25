@@ -46,6 +46,7 @@ scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（�
 - **IPC**：频道名 kebab-case；同步读取走 sendSync（`get-style-settings`/`get-theme`/`system-fonts`），修改走 invoke/handle（`style-settings-update`），广播用 `xxx-changed`。
 - **中文 Windows 编码**：`reg query` 等外部命令输出是 GBK，必须 `TextDecoder('gbk')` 解码，直接 utf8 会乱码。终端日志里的乱码只是显示问题，判断结果看 PASS/FAIL。
 - **button 不继承字体**：`<button>` 用 UA 控件字体，需显式 `button { font-family: inherit; }` 才能跟随 body。
+- **顶栏按钮懒挂载坑（实测）**：Notion 的开/收侧栏等顶栏按钮在冷加载/标签激活后异步挂载（骨架先出、按钮后到，窗口期实测秒级以上），盲发 `el.click()` 会静默落空（典型症状：☰ 能展开却收不回）。☰ 走 `createSidebarToggleRunner`：按 `.notion-sidebar` 实测 x 选方向 + 点击后轮询状态翻转、未翻则退避重试（约 9s 窗口），gen 闸口防连按互踩；主进程 `topbar-click` 只发动作名，选择器表由 preload 探针区解析（TOPBAR_ACTIONS 也随探针生成进 content.js）。e2e 看护：scripts/cdp-sidebar-check.js（覆盖温热路径与冷激活立即连按路径）。
 - **Notion 页面行为**：Ctrl+K 是开关（重发前先查 `[role="dialog"] input` 是否已存在）；"Open in desktop app?" 推广条也是 role=dialog 会吞掉注入按键；侧栏开关状态看 `.notion-sidebar` 的 x 坐标（-250 收起 / 0 展开），宽度恒为 270。注入按键在 Notion JS 就绪前会丢失，需带自检的重试。
 - **渲染层共享逻辑**（font-detect.js、tab-drag.js 等）用 UMD 双导出，浏览器挂 window、Node 走 module.exports 以便测试。
 - **Quick Find 选中后关浮层三坑（均实测）**：① Notion 只在 keydown 目标位于浮层内部时才响应 Escape（焦点在 body 上连可信 Escape 都不关），选中拦截时 preload 必须先把 DOM 焦点放回输入框（content.js refocusDialogInput）；② 视图被 removeChildView 摘除后注入的按键会被丢弃，同 tick 先注入再摘除也丢（队列未来得及处理），需要 Escape 处理完才能摘除——quick-find-flow.js 用探针轮询浮层关闭即走（快于旧固定 150ms），探针不通退回 150ms 兜底，绝不裸 setTimeout 直接摘；③ trigger 的重试阶梯（0~8s）在待命解除（选中/取消/切标签）后必须停轮（armedRec 闸口），否则把刚关掉的浮层重新打开。e2e 断言浮层关闭要查 `[role="dialog"] input`，裸 `[role="dialog"]` 会误中推广条；`/json` 里 notion 目标要排除 sw.js（service worker）。

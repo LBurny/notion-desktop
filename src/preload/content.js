@@ -119,6 +119,7 @@ window.addEventListener('keydown', (e) => {
 // [probes:generated begin]
 // 本区块由 scripts/build-preload-probes.js 生成，勿手改。
 // 改探针逻辑请改 src/main/topbar-actions.js 后运行 npm run sync-probes
+const TOPBAR_ACTIONS = {"sidebar":{"toggle":true,"openSelectors":[".notion-open-sidebar",".notion-topbar [aria-label=\"Lock sidebar open\"]",".notion-topbar [aria-label=\"Open sidebar\"]"],"closeSelectors":[".notion-sidebar [aria-label=\"Close sidebar\"]"],"selectors":[".notion-open-sidebar",".notion-topbar [aria-label=\"Lock sidebar open\"]",".notion-topbar [aria-label=\"Open sidebar\"]",".notion-sidebar [aria-label=\"Close sidebar\"]"]},"share":{"selectors":[".notion-topbar-share-menu",".notion-topbar [aria-label=\"Share\"]"]},"favorite":{"selectors":[".notion-topbar-favorite-button",".notion-topbar [aria-label=\"Favorite\"]",".notion-topbar [aria-label=\"Favorited\"]"]},"more":{"selectors":[".notion-topbar-more-button",".notion-topbar [aria-label=\"Actions\"]"]}};
 const CONTENT_FONT_SELECTORS = [".notion-page-content","[data-testid=\"page-title\"]"];
 function pickTopbarButton(root, selectors) {
   for (const sel of selectors) {
@@ -126,6 +127,29 @@ function pickTopbarButton(root, selectors) {
     if (el) return el;
   }
   return null;
+}
+function sidebarStateOf(root) {
+  const sb = root.querySelector('.notion-sidebar');
+  if (!sb || typeof sb.getBoundingClientRect !== 'function') return null;
+  return sb.getBoundingClientRect().x > -125 ? 'open' : 'closed';
+}
+function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, sleep, maxAttempts = 12 }) {
+  let gen = 0;
+  return async function toggleSidebar(cfg) {
+    const myGen = ++gen;
+    const wantOpen = sidebarStateOf(getRoot()) !== 'open'; // null（未渲染）按收起→目标开
+    const sels = wantOpen ? cfg.openSelectors : cfg.closeSelectors;
+    const flipped = () => {
+      const s = sidebarStateOf(getRoot());
+      return wantOpen ? s === 'open' : s === 'closed';
+    };
+    for (let n = 0; n < maxAttempts; n++) {
+      if (myGen !== gen || flipped()) return;
+      const el = pickTopbarButton(getRoot(), sels);
+      if (el) el.click();
+      await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 9s）
+    }
+  };
 }
 function favoriteStateOf(root, selectors) {
   const el = pickTopbarButton(root, selectors);
@@ -151,9 +175,19 @@ function pageFontOf(root, getComputedStyle) {
 }
 // [probes:generated end]
 
-ipcRenderer.on('topbar-click', (_e, selectors) => {
-  if (!Array.isArray(selectors)) return;
-  const el = pickTopbarButton(document, selectors);
+// 侧栏开关：状态感知 + 效果校验重试（按钮懒挂载时盲点会静默落空）。
+// 每 webContents 一个执行器实例，gen 闸口在生成函数内部。
+const sidebarToggle = createSidebarToggleRunner({
+  pickTopbarButton, sidebarStateOf,
+  getRoot: () => document,
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+});
+
+ipcRenderer.on('topbar-click', (_e, action) => {
+  const cfg = TOPBAR_ACTIONS[action];
+  if (!cfg) return;
+  if (cfg.toggle) { sidebarToggle(cfg); return; }
+  const el = pickTopbarButton(document, cfg.selectors);
   if (el) el.click();
 });
 
