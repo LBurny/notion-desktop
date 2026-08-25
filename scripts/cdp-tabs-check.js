@@ -1,7 +1,7 @@
 // 端到端验证标签页：SendKeys 真实按键 + CDP 读标题栏 DOM 断言
 // 前置：应用以 --remote-debugging-port=9222 启动（dev=electron 进程，打包版=Notion Desktop 进程）
 // 用法：node scripts/cdp-tabs-check.js [port] [进程名]
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -23,7 +23,9 @@ function sendKeys(seq) {
     `for ($i = 0; $i -lt 5; $i++) { $u::SetForegroundWindow($p.MainWindowHandle) | Out-Null; Start-Sleep -Milliseconds 250; if ($u::GetForegroundWindow() -eq $p.MainWindowHandle) { break } }`,
     `[System.Windows.Forms.SendKeys]::SendWait('${seq}')`,
   ].join('; ');
-  execSync(`powershell -NoProfile -Command "${ps}"`, { stdio: 'pipe' });
+  // execFile 直接传参绕开 cmd.exe：cmd 会把内嵌双引号（DllImport("user32.dll")）
+  // 剥离，导致 PowerShell Add-Type 编译失败
+  execFileSync('powershell', ['-NoProfile', '-Command', ps], { stdio: 'pipe' });
 }
 
 async function targets() {
