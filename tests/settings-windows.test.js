@@ -91,7 +91,9 @@ test('open 创建窗口：尺寸随缩放、居中、就绪后 zoom+theme', () =
   assert.equal(FakeBrowserWindow.all.length, 1);
   assert.equal(w.opts.width, 340);
   assert.equal(w.opts.height, 380);
-  assert.equal(w.opts.backgroundColor, '#252525');
+  // 透明窗口（body 圆角由页面 CSS 绘制），不再设置不透明底色
+  assert.equal(w.opts.transparent, true);
+  assert.equal(w.opts.backgroundColor, undefined);
   assert.match(w.htmlFile, /style-settings/);
   // 居中于 1920x1040 工作区
   assert.deepEqual(w.pos, { x: Math.round((1920 - 340) / 2), y: Math.round((1040 - 380) / 2) });

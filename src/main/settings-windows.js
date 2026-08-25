@@ -23,7 +23,7 @@ function createSettingsWindows({
       return w;
     }
     const zoom = getZoom();
-    const theme = getTheme();
+    const theme = getTheme(); // 首帧主题广播（页面启动即收，随正文变色）
     // 居中于主窗口所在显示器；宽高随缩放等比放大，且不超出工作区
     const area = screen.getDisplayMatching(getAnchorBounds()).workArea;
     const size = sizeFor(kind, zoom, area);
@@ -31,11 +31,11 @@ function createSettingsWindows({
       width: size.width,
       height: size.height,
       frame: false,
+      transparent: true, // 圆角由页面 body 的 border-radius 绘制（参考托盘菜单），底色不再由窗口承担
       resizable: false,
       skipTaskbar: false,
       show: false,
       icon: path.join(__dirname, '..', '..', 'assets', 'icon.png'),
-      backgroundColor: theme === 'dark' ? '#252525' : '#ffffff',
       webPreferences: { preload: path.join(__dirname, '..', 'preload', 'settings.js') },
     });
     wins[kind] = w;

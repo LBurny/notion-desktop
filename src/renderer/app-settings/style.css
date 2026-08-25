@@ -7,10 +7,12 @@ html[data-theme="dark"] {
   --input-bg: #1a1a1a; --border: rgba(255, 255, 255, 0.14); --hint: rgba(212, 212, 212, 0.5);
 }
 * { box-sizing: border-box; }
-html, body { margin: 0; height: 100%; overflow: hidden; }
+html { margin: 0; height: 100%; overflow: hidden; background: transparent; } /* 圆角窗：透明撑底，圆角由 body 绘制 */
 body {
   display: flex; flex-direction: column;
+  margin: 0; height: 100%; overflow: hidden;
   background: var(--bg); color: var(--fg);
+  border-radius: 4px; /* 与托盘菜单同款圆角（透明窗口） */
   font-family: "Segoe UI", "Microsoft YaHei", sans-serif; font-size: 13px;
   user-select: none;
 }
