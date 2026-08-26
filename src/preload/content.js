@@ -147,7 +147,7 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
       if (myGen !== gen || flipped()) return;
       const el = pickTopbarButton(getRoot(), sels);
       if (el) el.click();
-      await sleep(Math.min(50 + n * n * 20, 900)); // 前期高频探测挂载（首 50ms），后期退避；总窗口约 6s
+      await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 9s）
     }
   };
 }
@@ -173,17 +173,6 @@ function uiFontOf(root, getComputedStyle) {
   }
   return null;
 }
-function spaNavigate(doc, url) {
-  if (!url || !/^https:\/\/(www\.)?notion\.so\//.test(url)) return false;
-  if (!doc || !doc.createElement || !doc.body) return false;
-  const a = doc.createElement('a');
-  a.href = url;
-  a.style.display = 'none';
-  doc.body.appendChild(a);
-  a.click();
-  doc.body.removeChild(a);
-  return true;
-}
 // [probes:generated end]
 
 // 侧栏开关：状态感知 + 效果校验重试（按钮懒挂载时盲点会静默落空）。
@@ -201,10 +190,6 @@ ipcRenderer.on('topbar-click', (_e, action) => {
   const el = pickTopbarButton(document, cfg.selectors);
   if (el) el.click();
 });
-
-// 新标签认领预热视图后经 Notion 客户端路由瞬时跳转（注入隐藏锚点点击）；
-// 仅 notion.so URL，非法由探针侧拒绝。全量加载兜底在主进程侧。
-ipcRenderer.on('spa-navigate', (_e, url) => { spaNavigate(document, url); });
 
 ipcRenderer.on('topbar-favorite-query', (_e, selectors) => {
   if (!Array.isArray(selectors)) return;

@@ -61,7 +61,7 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
       if (myGen !== gen || flipped()) return;
       const el = pickTopbarButton(getRoot(), sels);
       if (el) el.click();
-      await sleep(Math.min(50 + n * n * 20, 900)); // 前期高频探测挂载（首 50ms），后期退避；总窗口约 6s
+      await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 9s）
     }
   };
 }
@@ -90,22 +90,8 @@ function uiFontOf(root, getComputedStyle) {
   return null;
 }
 
-// SPA 内导航：注入隐藏 <a href> 并 .click()，触发 Notion 自身客户端路由（瞬时，
-// did-navigate-in-page）。仅 notion.so URL；调用方负责全量加载兜底（路由未生效时）。
-function spaNavigate(doc, url) {
-  if (!url || !/^https:\/\/(www\.)?notion\.so\//.test(url)) return false;
-  if (!doc || !doc.createElement || !doc.body) return false;
-  const a = doc.createElement('a');
-  a.href = url;
-  a.style.display = 'none';
-  doc.body.appendChild(a);
-  a.click();
-  doc.body.removeChild(a);
-  return true;
-}
-
 module.exports = {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
   favoriteStateOf, quickFindStateOf,
-  uiFontOf, UI_FONT_SELECTORS, spaNavigate,
+  uiFontOf, UI_FONT_SELECTORS,
 };

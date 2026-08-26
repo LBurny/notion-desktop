@@ -12,18 +12,12 @@ function setup({ theme = 'dark' } = {}) {
     constructor() {
       this._url = 'https://www.notion.so/';
       this.cssKeys = 0;
-      this._loads = 0;
-      this._spaNavUrl = null;
     }
-    loadURL(u) { this._url = u; this._loads++; }
+    loadURL(u) { this._url = u; }
     loadFile() {}
-    on(ev, fn) {
-      // 仅存预热视图需要的两个里程碑；其它事件丢弃（现有测试不依赖）
-      if (ev === 'dom-ready') this._dom = fn;
-      if (ev === 'did-finish-load') this._finish = fn;
-    }
+    on() {}
     once() {}
-    send(ch, payload) { if (ch === 'spa-navigate') this._spaNavUrl = payload; }
+    send() {}
     sendInputEvent() {}
     insertCSS() { return Promise.resolve('k' + ++this.cssKeys); }
     removeInsertedCSS() { return Promise.resolve(); }
@@ -39,8 +33,7 @@ function setup({ theme = 'dark' } = {}) {
   }
   class WebContentsView {
     constructor(opts) {
-      this.webPreferences = opts.webPreferences;
-      created.push(this);
+      created.push(opts);
       this.webContents = new Wc();
       this.bgColors = [];
     }
@@ -55,7 +48,6 @@ function setup({ theme = 'dark' } = {}) {
   };
   try {
     delete require.cache[require.resolve('../src/main/tabs')];
-    delete require.cache[require.resolve('../src/main/standby-view')];
     const { createTabs } = orig.call(module, '../src/main/tabs');
     const { createTabManager } = require('../src/main/tab-manager');
     const tabs = createTabs({
@@ -99,46 +91,4 @@ test('视图加载底色跟随主题：dark → #191919，light → #ffffff', ()
   const light = setup({ theme: 'light' });
   light.tabs.newTab('https://www.notion.so/Page2');
   assert.deepEqual(light.tabs.activeView().bgColors, ['#ffffff']);
-});
-
-// ── 预热视图集成：newTab 优先认领预热视图并经 SPA 内导航，避免冷加载 ──
-
-test('newTab：standby 未就绪时回退冷加载（原路径不回归）', () => {
-  const { tabs, created } = setup();
-  tabs.newTab('https://www.notion.so/Page1');
-  assert.equal(created.length, 1, '无预热则建新视图冷加载');
-  assert.equal(created[0].webContents._url, 'https://www.notion.so/Page1');
-  assert.equal(created[0].webContents._loads, 1, '冷加载走 loadURL 一次');
-});
-
-test('ensureView：standby 就绪时认领并经 spa-navigate 跳转，不再 loadURL', () => {
-  const { tabs, created } = setup();
-  tabs.warmStandby();                 // 建预热视图（created[0]）
-  const sbWc = created[0].webContents;
-  sbWc._dom(); sbWc._finish();        // 推进到就绪
-  const sbView = created[0];
-  created.length = 0;
-  tabs.newTab('https://www.notion.so/Page1');
-  assert.equal(created.length, 1, '仅 rewarm 建一个后台预热，不为新标签建冷加载视图');
-  const active = tabs.activeView();
-  assert.strictEqual(active, sbView, '活动视图即被认领的预热视图');
-  assert.equal(active.webContents._spaNavUrl, 'https://www.notion.so/Page1', '经 SPA 内导航跳转');
-  assert.equal(active.webContents._loads, 1, '认领后不再 loadURL（仅预热时 1 次）');
-});
-
-test('ensureView：目标已是首页 URL 时不发 spa-navigate', () => {
-  const { tabs, created } = setup();
-  tabs.warmStandby();
-  created[0].webContents._dom();
-  created[0].webContents._finish();
-  created.length = 0;
-  tabs.newTab('https://www.notion.so/');
-  assert.equal(tabs.activeView().webContents._spaNavUrl, null, '首页无需 SPA 导航');
-});
-
-test('setViewsBackground 同步预热视图底色', () => {
-  const { tabs, created } = setup({ theme: 'dark' });
-  tabs.warmStandby();
-  tabs.setViewsBackground('light');
-  assert.deepEqual(created[0].bgColors, ['#191919', '#ffffff']);
 });

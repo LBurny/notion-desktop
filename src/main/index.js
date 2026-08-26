@@ -407,10 +407,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => { isQuitting = true; });
 
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-  if (tabs) tabs.disposeStandby(); // 销毁常驻预热视图，避免退出时后台视图残留
-});
+app.on('will-quit', () => globalShortcut.unregisterAll());
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

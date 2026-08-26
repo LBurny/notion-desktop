@@ -40,10 +40,6 @@ async function evalOn(client, expr) {
 
 const sidebarXExpr = `document.querySelector('.notion-sidebar') ? Math.round(document.querySelector('.notion-sidebar').getBoundingClientRect().x) : null`;
 const stateOf = (x) => (x === null ? null : x > -125 ? 'open' : 'closed');
-// 标题栏活动标签标题（去 " | Notion" 后缀）。预热视图也作为 notion.so 目标出现在
-// /json 中，按此标题精确选中活动标签，避免误选 detached 预热视图。
-const activeTitleExpr = `((document.querySelector('#tabs .tab.active .tab-title') || {}).textContent || '').replace(/\\s*\\|\\s*Notion$/, '').trim()`;
-const cleanT = (t) => (t || '').replace(/\s*\|\s*Notion$/, '').trim();
 
 let failures = 0;
 function check(name, actual, expected) {
@@ -52,13 +48,8 @@ function check(name, actual, expected) {
   console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: 实际=${JSON.stringify(actual)} 期望=${JSON.stringify(expected)}`);
 }
 
-async function notionPage(activeTitle) {
-  const all = targets().filter((t) => t.type === 'page' && t.url.startsWith('https://www.notion.so') && !t.url.includes('sw.js'));
-  if (activeTitle && activeTitle !== '加载中…') {
-    const hit = all.find((p) => cleanT(p.title) === activeTitle);
-    if (hit) return hit;
-  }
-  return all[0];
+async function notionPage() {
+  return targets().find((t) => t.type === 'page' && t.url.startsWith('https://www.notion.so') && !t.url.includes('sw.js'));
 }
 
 // 按 ☰（真实 IPC 路径：标题栏按钮 → main → preload 执行器）
@@ -84,7 +75,7 @@ async function main() {
   const tb = await attach(tbTarget.webSocketDebuggerUrl);
 
   // —— A：温热路径 ——
-  let page = await notionPage(await evalOn(tb, activeTitleExpr));
+  let page = await notionPage();
   if (!page) throw new Error('notion page target not found');
   let pg = await attach(page.webSocketDebuggerUrl);
   const s0 = stateOf(await evalOn(pg, sidebarXExpr));
@@ -109,13 +100,11 @@ async function main() {
   } else {
     const before = targets().filter((t) => t.type === 'page' && t.url.startsWith('https://www.notion.so')).map((t) => t.id);
     await evalOn(tb, `document.querySelectorAll('#tabs .tab')[${coldIdx}].click()`);
-    // 等该标签的页面目标出现（可能新加载）；按活动标题选中活动（冷）标签，避开预热视图
+    // 等该标签的页面目标出现（可能新加载）
     let cold = null;
     for (let i = 0; i < 60 && !cold; i++) {
       await sleep(500);
-      const at = cleanT(await evalOn(tb, activeTitleExpr));
-      const all = targets().filter((t) => t.type === 'page' && t.url.startsWith('https://www.notion.so') && !t.url.includes('sw.js'));
-      cold = (at && at !== '加载中…' && all.find((p) => cleanT(p.title) === at)) || all[0];
+      cold = (await notionPage()) && targets().find((t) => t.type === 'page' && t.url.startsWith('https://www.notion.so') && !t.url.includes('sw.js'));
     }
     if (!cold || before.includes(cold.id)) {
       // 目标早已加载过也算冷启动等价场景跳过说明

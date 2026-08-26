@@ -6,7 +6,6 @@ const { shortcutFor } = require('./tab-shortcuts');
 const { createQuickFindFlow } = require('./quick-find-flow');
 const { findSlashCommand, runSlashCommand } = require('./slash-commands');
 const { createTopbarRelay } = require('./topbar-relay');
-const { createStandbyView } = require('./standby-view');
 
 const AUTH_POPUPS = [
   'https://accounts.google.com', 'https://appleid.apple.com',
@@ -29,20 +28,6 @@ function createTabs(deps) {
   } = deps;
 
   const records = new Map(); // id → { id, url, title, view: null, cssKey: null, reloaded: false }
-
-  // 预热视图：常驻一个已加载首页的 detached 视图，newTab 认领它并经 SPA 内导航
-  //（content.js 的 spa-navigate）瞬时跳转，避免冷加载整个 Notion SPA（实测 ~4.6s）。
-  // 首标签 did-finish-load 后才预热，不与启动首加载抢带宽；认领后后台重建保证下一个新标签同样秒开。
-  let standbyWarmedOnce = false;
-  const standby = createStandbyView({
-    partition, preloadPath, homeUrl, getCss, getTheme,
-  });
-  function warmStandby() { standby.warm(); }
-
-  // 首页尾斜杠差异归一化（认领/SPA 兜底比较 URL 用）
-  function normalizeNotionUrl(u) {
-    try { return new URL(u).href.replace(/\/$/, ''); } catch { return u; }
-  }
 
   // Quick Find 待命状态机（选中才开新标签的交互）抽至 quick-find-flow.js
   const flow = createQuickFindFlow({
@@ -104,28 +89,6 @@ function createTabs(deps) {
 
   function ensureView(rec) {
     if (rec.view) return rec.view;
-    // 优先认领预热视图（已加载首页 + CSS 注入）：经 Notion 客户端路由瞬时跳转，
-    // 避免冷加载整个 SPA。未就绪回退下方冷加载，无回归。
-    const claimed = standby.claim();
-    if (claimed) {
-      rec.view = claimed.view;
-      rec.cssKey = claimed.cssKey;
-      wireViewEvents(rec);
-      claimed.view.webContents.setZoomFactor(getZoom());
-      standby.rewarm(); // 后台重建预热，保证下一个新标签同样秒开
-      const wc = claimed.view.webContents;
-      if (normalizeNotionUrl(wc.getURL()) !== normalizeNotionUrl(rec.url)) {
-        wc.send('spa-navigate', rec.url);
-        // 兜底：SPA 路由未在 1.5s 内生效（如 Notion 对该 URL 走整页加载）则整页加载
-        const target = rec.url;
-        setTimeout(() => {
-          if (!wc.isDestroyed() && normalizeNotionUrl(wc.getURL()) !== normalizeNotionUrl(target)) {
-            wc.loadURL(target);
-          }
-        }, 1500);
-      }
-      return claimed.view;
-    }
     const bg = themeBackground(getTheme ? getTheme() : 'light');
     // 加载期底色跟随主题：深色主题下默认白底会造成刺眼白闪。
     // 注意：Electron 43 的 WebContentsView 构造选项没有 backgroundColor（传了会被静默忽略），
@@ -161,7 +124,6 @@ function createTabs(deps) {
         })
         .catch(() => {});
     });
-    standby.reinjectCss(getCss);
   }
 
   // Notion 的 document.title 统一带 " | Notion" 后缀，标签条上纯属浪费宽度
@@ -176,8 +138,6 @@ function createTabs(deps) {
     // 兜底：初始标题可能先于 page-title-updated 监听就绪
     wc.on('did-finish-load', () => {
       if (manager.update(rec.id, { title: cleanTitle(wc.getTitle()) })) onChanged();
-      // 首标签加载完成后才预热，避免与启动首加载抢带宽
-      if (!standbyWarmedOnce) { standbyWarmedOnce = true; standby.warm(); }
     });
     const onNav = (_e, isMainFrame) => {
       if (isMainFrame === false) return;
@@ -340,14 +300,12 @@ function createTabs(deps) {
   // 主题切换时同步所有已建视图的加载底色（下次加载/刷新不再闪白）
   function setViewsBackground(theme) {
     forEachView((v) => v.setBackgroundColor(themeBackground(theme)));
-    standby.setTheme(theme);
   }
 
   return {
     newTab, closeTab, activateTab, nextTab, prevTab, activatePosition,
     reorder, restore, layout, forEachView, findByWebContents, reinjectCss,
     setViewsBackground,
-    warmStandby, disposeStandby: standby.dispose,
     topbarAction: relay.topbarAction,
     // Quick Find 待命交互门面（实现在 quick-find-flow.js）
     newTabInteractive: flow.newTabInteractive,
