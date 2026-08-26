@@ -26,6 +26,13 @@
   !define MUI_FINISHPAGE_RUN
   !define MUI_FINISHPAGE_RUN_FUNCTION "StartApp"
 
+  ; 预声明 MUI 内部变量 $mui.FinishPage.Run + 其去重守卫宏。
+  ; MUI 在 MUI_PAGE_FINISH 展开时才声明此 Var，但我们的 SHOW/LEAVE 函数体
+  ; 在此之前就引用了它——NSIS 在解析函数体时需要变量已存在，否则报 unknown variable。
+  ; 预定义 MUI_FINISHPAGE_RUN_VARIABLES 让 MUI 的 !ifndef 守卫跳过重复声明
+  !define MUI_FINISHPAGE_RUN_VARIABLES
+  Var mui.FinishPage.Run
+
   Function FinishPageShow
     ; 从注册表读取上次选择（首次安装为空 → 默认勾选）
     ReadRegStr $NDShortcutState HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut"

@@ -19,6 +19,7 @@ const { calcMenuPosition } = require('./menu-position');
 const { loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss, titlebarHeightForZoom } = require('./style-settings');
 const { loadTheme } = require('./theme-store');
 const { createThemeService } = require('./theme-service');
+const { applyWindowDarkMode } = require('./window-dark-mode');
 const { createHotkeys } = require('./hotkey-service');
 const { comboToAccelerator } = require('./hotkeys');
 const { listSystemFonts } = require('./system-fonts');
@@ -201,6 +202,9 @@ function createWindow({ startHidden = false } = {}) {
   win.on('resize', layoutViews);
   trackWindow(win, stateFile);
   perf.mark('window-created');
+  // 启动时按当前主题设一次深色非客户区（消除 Win10 无边框窗口最大化时 1px 白边）；
+  // 后续主题切换由 themeService.onApplied 同步
+  applyWindowDarkMode(win, themeService.get());
 
   win.on('maximize', () => titlebarView.webContents.send('window-maximized', true));
   win.on('unmaximize', () => titlebarView.webContents.send('window-maximized', false));
@@ -247,6 +251,7 @@ app.whenReady().then(() => {
     onApplied: (theme) => {
       broadcastTheme(theme);
       if (win) win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
+      if (win) applyWindowDarkMode(win, theme); // 单窗口深色非客户区：消除 Win10 无边框窗口最大化时 DWM 残留的 1px 白边
       if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
     },
   });
