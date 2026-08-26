@@ -173,6 +173,17 @@ function uiFontOf(root, getComputedStyle) {
   }
   return null;
 }
+function spaNavigate(doc, url) {
+  if (!url || !/^https:\/\/(www\.)?notion\.so\//.test(url)) return false;
+  if (!doc || !doc.createElement || !doc.body) return false;
+  const a = doc.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  doc.body.appendChild(a);
+  a.click();
+  doc.body.removeChild(a);
+  return true;
+}
 // [probes:generated end]
 
 // 侧栏开关：状态感知 + 效果校验重试（按钮懒挂载时盲点会静默落空）。
@@ -203,6 +214,13 @@ ipcRenderer.on('quick-find-state-query', () => {
 ipcRenderer.on('ui-font-query', () => {
   ipcRenderer.send('ui-font', uiFontOf(document, window.getComputedStyle));
 });
+
+// 新标签认领预热视图后经 Notion 客户端路由瞬时跳转（注入隐藏锚点点击）；
+// 仅 notion.so URL，非法由探针侧拒绝。整页加载兜底在主进程侧。
+ipcRenderer.on('spa-navigate', (_e, url) => { spaNavigate(document, url); });
+
+// SPA 跳转改 location.href 但不反映到 webContents.getURL()，主进程据此判定跳转是否生效。
+ipcRenderer.on('location-href-query', () => { ipcRenderer.send('location-href', location.href); });
 
 contextBridge.exposeInMainWorld('notionDesktop', {
   retry: () => ipcRenderer.send('retry-load'),

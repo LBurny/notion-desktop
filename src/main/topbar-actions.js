@@ -90,8 +90,23 @@ function uiFontOf(root, getComputedStyle) {
   return null;
 }
 
+// SPA 内导航：注入隐藏 <a href> 并 .click()，触发 Notion 自身客户端路由（瞬时，
+// did-navigate-in-page / location.href 改变但 webContents.getURL() 不变）。
+// 仅 notion.so URL；调用方用 location.href 探针判定是否生效，未生效则整页加载兜底。
+function spaNavigate(doc, url) {
+  if (!url || !/^https:\/\/(www\.)?notion\.so\//.test(url)) return false;
+  if (!doc || !doc.createElement || !doc.body) return false;
+  const a = doc.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  doc.body.appendChild(a);
+  a.click();
+  doc.body.removeChild(a);
+  return true;
+}
+
 module.exports = {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
   favoriteStateOf, quickFindStateOf,
-  uiFontOf, UI_FONT_SELECTORS,
+  uiFontOf, UI_FONT_SELECTORS, spaNavigate,
 };
