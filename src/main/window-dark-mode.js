@@ -67,7 +67,9 @@ function tryShells(exec, shells, ps, log) {
     exec(shell, args, { windowsHide: true }, (err, stdout) => {
       const status = parseStatus(stdout);
       if (status) { log(`[dwm] ${status} via ${shell}`); return; } // 已生效，不再试后续 shell
-      next(); // 无状态行（含 err/闪退）→ 回退下一个 shell
+      // 无状态行：记录该 shell 失败细节后回退下一个
+      log(`[dwm] ${shell} no-status${err ? ` err=${String(err).slice(0, 120)}` : ''}${stdout ? ` stdout=${String(stdout).slice(0, 160)}` : ''}`);
+      next();
     });
   };
   next();
