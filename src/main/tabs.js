@@ -222,7 +222,7 @@ function createTabs(deps) {
       const s = shortcutFor(input);
       if (s) {
         e.preventDefault(); // 页面收不到这些键，避免与 Notion 编辑器快捷键冲突
-        if (s.action === 'new-tab') newTabInteractive();
+        if (s.action === 'new-tab') flow.newTabInteractive();
         else if (s.action === 'close-tab') { const a = manager.active(); if (a) closeTab(a.id); }
         else if (s.action === 'next-tab') nextTab();
         else if (s.action === 'prev-tab') prevTab();

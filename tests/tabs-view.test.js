@@ -26,7 +26,7 @@ function setup({ theme = 'dark' } = {}) {
     }
     loadURL(u) { this._url = u; this._loads++; }
     loadFile() {}
-    on(ev, fn) { if (ev === 'dom-ready') this._dom = fn; if (ev === 'did-finish-load') this._finish = fn; }
+    on(ev, fn) { if (ev === 'dom-ready') this._dom = fn; if (ev === 'did-finish-load') this._finish = fn; if (ev === 'before-input-event') this._bie = fn; }
     once() {}
     send(ch, payload) {
       if (ch === 'spa-navigate') this._spaNavUrl = payload;
@@ -178,4 +178,17 @@ test('setViewsBackground 同步预热视图底色', () => {
   tabs.warmStandby();
   tabs.setViewsBackground('light');
   assert.deepEqual(created[0].bgColors, ['#191919', '#ffffff']);
+});
+
+// ── Ctrl+T 回归：before-input-event 的 new-tab 动作必须可调用 ──
+// v0.2.2 及更早 before-input-event 里裸调 newTabInteractive()（未定义）→ Ctrl+T 崩溃。
+test('Ctrl+T 触发 new-tab 动作不抛 ReferenceError', () => {
+  const { tabs, created } = setup();
+  tabs.newTab('https://www.notion.so/Page1'); // 建视图并 wire before-input-event
+  const wc = created[0].webContents;
+  // 活动页设成 file:// 使 newTabInteractive 走 newTab(homeUrl,{search}) 无定时器分支，避免测试挂起
+  wc._url = 'file:///error.html';
+  assert.doesNotThrow(() => {
+    wc._bie({ preventDefault() {} }, { type: 'keyDown', control: true, key: 't' });
+  }, 'Ctrl+T 不应抛 ReferenceError');
 });
