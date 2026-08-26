@@ -55,10 +55,15 @@ h1 *,
 }
 
 /* ========== 代码块 Consolas 字体 ========== */
+/* 代码正文在 div[contenteditable="true"] 内，被正文 .notion-page-block div[contenteditable]
+   "true" * (0,2,1) 压过——需镜像同结构 .notion-code-block div[contenteditable="true"] *
+   (0,2,1)，本文件内代码规则在正文之后，同特异性后注入者赢 */
 .notion-code-block,
 .notion-code-block pre,
 .notion-code-block code,
-.notion-code-block * {
+.notion-code-block *,
+.notion-code-block div[contenteditable="true"],
+.notion-code-block div[contenteditable="true"] * {
   font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
 }
 

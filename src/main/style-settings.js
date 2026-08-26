@@ -171,7 +171,11 @@ const UI_SELECTORS = [
   '.notion-quick-find', '.notion-quick-find *',
   '.notion-search', '.notion-search *',
 ].join(', ');
-const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *';
+// 代码块：容器/工具栏（语言标签等）低特异性即可；代码正文在 div[contenteditable="true"]
+// 内，被正文 .notion-page-block div[contenteditable="true"] * (0,2,1) 压过——需镜像同结构
+// 选择器 .notion-code-block div[contenteditable="true"] * (0,2,1)，同特异性后注入者赢。
+// 浮层预览同理补 contenteditable 专项。
+const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *';
 // 行内公式：.notion-text-block 专项 (0,4,0) 复用 default.css 同特异性 :not 选择器，
 // 压过 custom.css 旧副本的同特异性规则（同特异性后注入者赢）；通用 .katex:not(...)
 // (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式——这些块无 custom.css 公式
