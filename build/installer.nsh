@@ -1,14 +1,15 @@
 ; Notion Desktop 自定义安装完成页：
-; 1) 新增「创建桌面快捷方式」复选框（electron-builder 默认无此选项，只自动创建）
-; 2) 保留「运行程序」复选框
+; 1) MUI 内置「运行程序」复选框（MUI_FINISHPAGE_RUN）——布局由 MUI 自动计算
+; 2) 自定义「创建桌面快捷方式」复选框——紧跟 Run 复选框下方
 ; 3) 两个复选框状态持久化到注册表，下次安装自动恢复（首次安装默认勾选）
 ;
 ; customFinishPage 宏替换 assistedInstaller.nsh 里内置的 MUI_PAGE_FINISH。
-; 复选框文案用英文（MUI 标准元素已由 electron-builder 本地化，自定义控件不跟语言走）
+; MUI 的 LEAVE 函数会先调 MUI_PAGE_CUSTOMFUNCTION_LEAVE（ ours），再自动读 Run
+; 复选框并调 StartApp——所以我们只需在 LEAVE 里持久化状态 + 建桌面快捷方式，
+; 运行程序由 MUI 自行处理。
 
 !macro customFinishPage
   Var NDShortcutCheckbox
-  Var NDRunCheckbox
   Var NDShortcutState
   Var NDRunState
 
@@ -21,6 +22,10 @@
     ${StdUtils.ExecShellAsUser} $0 "$launchLink" "open" "$1"
   FunctionEnd
 
+  ; MUI 内置 Run 复选框：定义后 MUI 自动创建并处理布局/Leave 行为
+  !define MUI_FINISHPAGE_RUN
+  !define MUI_FINISHPAGE_RUN_FUNCTION "StartApp"
+
   Function FinishPageShow
     ; 从注册表读取上次选择（首次安装为空 → 默认勾选）
     ReadRegStr $NDShortcutState HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut"
@@ -32,23 +37,29 @@
       StrCpy $NDRunState "1"
     ${EndIf}
 
-    ; 在完成页上创建复选框
-    ${NSD_CreateCheckbox} 120u 100u 195u 10u "Create desktop shortcut"
-    Pop $NDShortcutCheckbox
-    ${If} $NDShortcutState == "1"
-      ${NSD_SetState} $NDShortcutCheckbox ${BST_CHECKED}
+    ; 恢复 MUI Run 复选框状态（MUI 默认勾选，这里用注册表值覆盖）
+    ${If} $NDRunState == "1"
+      SendMessage $mui.FinishPage.Run ${BM_SETCHECK} ${BST_CHECKED} 0
+    ${Else}
+      SendMessage $mui.FinishPage.Run ${BM_SETCHECK} ${BST_UNCHECKED} 0
     ${EndIf}
 
-    ${NSD_CreateCheckbox} 120u 115u 195u 10u "Run $(^Name)"
-    Pop $NDRunCheckbox
-    ${If} $NDRunState == "1"
-      ${NSD_SetState} $NDRunCheckbox ${BST_CHECKED}
+    ; 在 Run 复选框下方创建桌面快捷方式复选框
+    ; Run 在 MUI_FINISHPAGE_RUN_TOP（= TEXT_BOTTOM_BUTTONS + 5 ≈ 90u），
+    ; ShowReadme 本应在 RUN_TOP + 20 = 110u，我们占用这个位置
+    ${NSD_CreateCheckbox} 120u 110u 195u 10u "Create desktop shortcut"
+    Pop $NDShortcutCheckbox
+    SetCtlColors $NDShortcutCheckbox "${MUI_TEXTCOLOR}" "${MUI_BGCOLOR}"
+    System::Call 'UXTHEME::SetWindowTheme(p $NDShortcutCheckbox, w" ", w" ")'
+    ${If} $NDShortcutState == "1"
+      SendMessage $NDShortcutCheckbox ${BM_SETCHECK} ${BST_CHECKED} 0
     ${EndIf}
   FunctionEnd
 
   Function FinishPageLeave
+    ; 读取两个复选框状态
     ${NSD_GetState} $NDShortcutCheckbox $NDShortcutState
-    ${NSD_GetState} $NDRunCheckbox $NDRunState
+    SendMessage $mui.FinishPage.Run ${BM_GETCHECK} 0 0 $NDRunState
 
     ; 持久化到注册表供下次安装恢复
     WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut" $NDShortcutState
@@ -62,10 +73,7 @@
       System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
     ${EndIf}
 
-    ; 勾选了运行则启动程序
-    ${If} $NDRunState == ${BST_CHECKED}
-      Call StartApp
-    ${EndIf}
+    ; 运行程序由 MUI LEAVE 自动处理（读 $mui.FinishPage.Run → 调 StartApp）
   FunctionEnd
 
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishPageShow
