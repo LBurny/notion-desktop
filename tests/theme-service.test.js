@@ -44,12 +44,19 @@ test('接受上报：落盘 + 回调 + get() 更新', () => {
   assert.equal(JSON.parse(fs.readFileSync(themeFile, 'utf8')).theme, 'dark');
 });
 
-test('与当前主题相同的上报去重：不落盘不回调', () => {
+test('与当前主题相同的上报：不落盘，但触发 onApplied 以便重设 NC', () => {
   const { svc, themeFile, applied, advance } = setup({ initial: 'dark' });
   advance(GRACE_MS + 1); // 越过宽限期排除干扰
+  assert.equal(svc.report('dark'), false); // 主题未变化 → 返回 false
+  assert.deepEqual(applied, ['dark']); // 仍触发回调：窗口就绪后重设 NC（修复持久化 dark 时早期 NC 未生效）
+  assert.equal(fs.existsSync(themeFile), false); // 未变化不落盘
+});
+
+test('持久化 dark 启动后 Notion 首次 dark 上报触发重设（跨机器白线根因回归）', () => {
+  const { svc, applied, advance } = setup({ initial: 'dark' });
+  advance(2000); // 模拟 Notion 加载完成后上报（此时窗口已就绪）
   assert.equal(svc.report('dark'), false);
-  assert.deepEqual(applied, []);
-  assert.equal(fs.existsSync(themeFile), false);
+  assert.deepEqual(applied, ['dark']); // 关键：即便主题未变也要重设 NC
 });
 
 test('宽限期内的 light 假象被忽略且不污染 theme.json', () => {

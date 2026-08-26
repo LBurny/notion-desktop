@@ -19,12 +19,17 @@ function createThemeService({ themeFile, initial, onApplied, now = () => Date.no
     get: () => current,
     // 返回是否接受了上报（落盘/回调发生）；重复主题与假象上报都算未接受
     report(theme, at = now()) {
-      if (theme === current) return false;
-      if (!shouldAcceptReport(theme, current, at - bootedAt)) return false;
+      if (theme !== 'dark' && theme !== 'light') return false;
+      const changed = theme !== current;
+      // 宽限期只拦"与持久化 dark 冲突的 light 假象"；dark 上报任何时刻放行
+      if (changed && !shouldAcceptReport(theme, current, at - bootedAt)) return false;
       current = theme;
-      if (themeFile) saveTheme(themeFile, theme);
+      if (changed && themeFile) saveTheme(themeFile, theme);
+      // 即便主题未变也触发 onApplied：持久化 dark 时启动早期那次 NC 设置可能因
+      // 窗口尚未就绪而未生效，Notion 上报 dark（此时窗口已就绪）需要这次重设机会，
+      // 否则 Win10 无边框窗口的 1px 白边会一直残留（跨机器时序差异根因）
       if (onApplied) onApplied(theme);
-      return true;
+      return changed;
     },
   };
 }
