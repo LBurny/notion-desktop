@@ -58,19 +58,22 @@ h1 *,
 /* 代码正文在 div[contenteditable="true"] 内，被正文 .notion-page-block div[contenteditable]
    "true" * (0,2,1) 压过——需镜像同结构 .notion-code-block div[contenteditable="true"] *
    (0,2,1)，本文件内代码规则在正文之后，同特异性后注入者赢。
-   行内代码 <code> 同样在 div[contenteditable="true"] 内，用 .notion-page-content
-   div[contenteditable="true"] code (0,2,2) 压过正文 (0,2,1)；.notion-page-content
-   code (0,1,1) 兜底非 contenteditable 路径（压过 .notion-page-content * 0,1,0） */
+   行内代码：Notion 用 div.notion-inline-code-container（非 <code>），内部 span 带内联
+   等宽 font-family（无 !important）被正文 .notion-page-content * (0,1,0) !important 压过；
+   .notion-page-content .notion-inline-code-container * (0,2,0) !important 压过正文，
+   contenteditable 专项 (0,3,1) 兜底 .notion-page-block 在场时的正文 0,2,1 */
 .notion-code-block,
 .notion-code-block pre,
 .notion-code-block code,
 .notion-code-block *,
 .notion-code-block div[contenteditable="true"],
 .notion-code-block div[contenteditable="true"] *,
-.notion-page-content code,
-.notion-page-content div[contenteditable="true"] code,
-[role="dialog"] code,
-[role="dialog"] div[contenteditable="true"] code {
+.notion-page-content .notion-inline-code-container,
+.notion-page-content .notion-inline-code-container *,
+.notion-page-content div[contenteditable="true"] .notion-inline-code-container,
+.notion-page-content div[contenteditable="true"] .notion-inline-code-container *,
+[role="dialog"] .notion-inline-code-container,
+[role="dialog"] .notion-inline-code-container * {
   font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
 }
 

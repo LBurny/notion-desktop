@@ -61,6 +61,9 @@ function expectedFonts() {
 }
 
 // 注入探针并读计算字体（每轮重建容器，防 React 重渲染清理）
+// 探针结构镜像 Notion 真实 DOM：代码正文/行内代码都在 div[contenteditable="true"] 内，
+// 行内代码内部 span 带「内联等宽 font-family（无 !important）」——正文 !important 规则
+// 会压过内联样式，仅靠代码选择器 !important + 同等/更高特异性才能夺回（实测坑）。
 const PROBE_EXPR = `(() => {
   const old = document.getElementById('__nd-font-probe');
   if (old) old.remove();
@@ -72,18 +75,37 @@ const PROBE_EXPR = `(() => {
   const bodyEl = document.createElement('span');
   bodyEl.textContent = 'probe';
   root.appendChild(bodyEl);
+  // 块级代码：.notion-code-block > div[contenteditable] > pre > code（镜像真实嵌套，
+  // 代码正文在 contenteditable 内，被正文 (0,2,1) 压过需 contenteditable 专项选择器夺回）
   const codeWrap = document.createElement('div');
   codeWrap.className = 'notion-code-block';
+  const codeCe = document.createElement('div');
+  codeCe.setAttribute('contenteditable', 'true');
+  const codePre = document.createElement('pre');
   const codeEl = document.createElement('code');
   codeEl.textContent = 'probe';
-  codeWrap.appendChild(codeEl);
+  codePre.appendChild(codeEl); codeCe.appendChild(codePre); codeWrap.appendChild(codeCe);
   root.appendChild(codeWrap);
+  // 行内代码：.notion-text-block > div[contenteditable] > div.notion-inline-code-container
+  // > span（内联 font-family: monospace 无 !important，镜像 Notion 真实结构）
   const textWrap = document.createElement('div');
   textWrap.className = 'notion-text-block';
+  const textCe = document.createElement('div');
+  textCe.setAttribute('contenteditable', 'true');
+  const inlineWrap = document.createElement('div');
+  inlineWrap.className = 'notion-inline-code-container';
+  const inlineSpan = document.createElement('span');
+  inlineSpan.textContent = 'probe';
+  inlineSpan.setAttribute('style', 'font-family: "SFMono-Regular", Menlo, Consolas, monospace');
+  inlineWrap.appendChild(inlineSpan); textCe.appendChild(inlineWrap); textWrap.appendChild(textCe);
+  root.appendChild(textWrap);
+  // 内联公式：.notion-text-block > .katex
+  const mathWrap = document.createElement('div');
+  mathWrap.className = 'notion-text-block';
   const mathEl = document.createElement('span');
   mathEl.className = 'katex';
-  textWrap.appendChild(mathEl);
-  root.appendChild(textWrap);
+  mathWrap.appendChild(mathEl);
+  root.appendChild(mathWrap);
   page.appendChild(root);
   const uiEl = document.createElement('span');
   uiEl.id = '__nd-font-probe-ui';
@@ -93,7 +115,16 @@ const PROBE_EXPR = `(() => {
   // 真实正文文字叶节点：分区字体必须落到这里（探针 span 只覆盖低特异性路径，
   // 文字叶节点由 [contenteditable="true"]:first-of-type 这类 0,2,0 规则命中）
   const leaf = page.querySelector('.notion-text-block div[contenteditable="true"]');
-  return { body: cs(bodyEl), ui: cs(uiEl), code: cs(codeEl), math: cs(mathEl), realLeaf: leaf ? cs(leaf) : null };
+  // 真实行内代码：页面若已有 .notion-inline-code-container，校验其内部 span 的计算字体
+  const realInline = page.querySelector('.notion-inline-code-container span, .notion-inline-code-container');
+  return {
+    body: cs(bodyEl), ui: cs(uiEl),
+    code: cs(codeEl),             // 块级代码正文（contenteditable 内）
+    inlineCode: cs(inlineSpan),  // 行内代码内部 span（内联 font-family 被 !important 夺回）
+    math: cs(mathEl),
+    realLeaf: leaf ? cs(leaf) : null,
+    realInlineCode: realInline ? cs(realInline) : null,
+  };
 })()`;
 
 let failures = 0;
@@ -135,8 +166,11 @@ async function main() {
   check('正文字体', fonts.body, want.body);
   check('界面字体（侧栏）', fonts.ui, want.ui);
   check('代码块字体', fonts.code, want.code);
+  check('行内代码字体', fonts.inlineCode, want.code); // 内联 font-family 被 !important 夺回路径：防假绿
   check('内联公式字体', fonts.math, want.math);
   check('真实正文文字叶节点', fonts.realLeaf, want.body); // 特异性 0,2,0 路径：防假绿
+  // 页面真实行内代码（若有）：.notion-inline-code-container 内部 span 的计算字体
+  if (fonts.realInlineCode) check('真实行内代码', fonts.realInlineCode, want.code);
 
   pg.close();
   console.log(failures ? `FAIL (${failures} 项)` : 'PASS');

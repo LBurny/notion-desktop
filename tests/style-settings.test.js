@@ -288,14 +288,16 @@ test('buildSettingsCss 代码正文 contenteditable 专项选择器：压过正�
   assert.ok(css.includes('[role="dialog"] .notion-code-block div[contenteditable="true"] *'), '浮层预览代码正文同样覆盖');
 });
 
-test('buildSettingsCss 行内代码 <code> 选择器：覆盖文本块里的行内代码（np.float32 等）', () => {
-  // 行内代码 <code> 直接在文本块 div[contenteditable="true"] 内，被正文 (0,2,1) 压过；
-  // .notion-page-content div[contenteditable="true"] code (0,2,2) 压过正文，
-  // .notion-page-content code (0,1,1) 兜底非 contenteditable 路径。
+test('buildSettingsCss 行内代码选择器：覆盖 .notion-inline-code-container（Notion 行内代码真实结构）', () => {
+  // Notion 行内代码是 div.notion-inline-code-container（非 <code>），内部 span 带内联等宽
+  // font-family（无 !important）被正文 .notion-page-content * (0,1,0) !important 压过。
+  // .notion-page-content .notion-inline-code-container * (0,2,0) !important 压过正文 0,1,0，
+  // 并等于 :first-of-type 0,2,0（后注入者赢）；contenteditable 专项 (0,3,1) 兜底 pageBlock 在场。
   const css = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
-  assert.ok(css.includes('.notion-page-content div[contenteditable="true"] code'), '行内代码 contenteditable 专项 (0,2,2) 压过正文');
-  assert.ok(css.includes('.notion-page-content code'), '行内代码非 contenteditable 兜底');
-  assert.ok(css.includes('[role="dialog"] code'), '浮层预览行内代码同样覆盖');
+  assert.ok(css.includes('.notion-page-content .notion-inline-code-container'), '行内代码容器选择器');
+  assert.ok(css.includes('.notion-page-content .notion-inline-code-container *'), '行内代码内部 span（带内联 font-family）覆盖');
+  assert.ok(css.includes('.notion-page-content div[contenteditable="true"] .notion-inline-code-container'), 'contenteditable 专项 (0,3,1) 兜底 pageBlock 在场');
+  assert.ok(css.includes('[role="dialog"] .notion-inline-code-container'), '浮层预览行内代码同样覆盖');
 });
 
 test('buildSettingsCss 公式槽：默认不下发，自定义时内联+展示+浮层全覆盖并垫 KaTeX_Main', () => {

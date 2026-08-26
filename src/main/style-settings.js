@@ -174,11 +174,13 @@ const UI_SELECTORS = [
 // 代码块：容器/工具栏（语言标签等）低特异性即可；代码正文在 div[contenteditable="true"]
 // 内，被正文 .notion-page-block div[contenteditable="true"] * (0,2,1) 压过——需镜像同结构
 // 选择器 .notion-code-block div[contenteditable="true"] * (0,2,1)，同特异性后注入者赢。
-// 行内代码：<code> 直接在文本块的 div[contenteditable="true"] 内，同样被正文 (0,2,1)
-// 压过；.notion-page-content div[contenteditable="true"] code (0,2,2) 压过正文，
-// .notion-page-content code (0,1,1) 兜底非 contenteditable 路径（压过 .notion-page-content *）。
-// 浮层预览同理补 contenteditable 专项。
-const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *, .notion-page-content code, .notion-page-content div[contenteditable="true"] code, [role="dialog"] code, [role="dialog"] div[contenteditable="true"] code';
+// 行内代码：Notion 用 div.notion-inline-code-container（不是 <code>），内部 span 带内联
+// 等宽 font-family（无 !important）被正文 .notion-page-content * (0,1,0) !important 压过
+// （行内代码不在 .notion-page-block 内，故正文最高只到 0,2,0 的 :first-of-type 路径）。
+// .notion-page-content .notion-inline-code-container * (0,2,0) !important 压过正文 0,1,0 与
+// 等于 :first-of-type 0,2,0（后注入者赢）；.notion-page-content div[contenteditable] …
+// (0,3,1) 兜底 .notion-page-block 在场时正文 0,2,1。浮层预览同理。
+const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *, .notion-page-content .notion-inline-code-container, .notion-page-content .notion-inline-code-container *, .notion-page-content div[contenteditable="true"] .notion-inline-code-container, .notion-page-content div[contenteditable="true"] .notion-inline-code-container *, [role="dialog"] .notion-inline-code-container, [role="dialog"] .notion-inline-code-container *';
 // 行内公式：.notion-text-block 专项 (0,4,0) 复用 default.css 同特异性 :not 选择器，
 // 压过 custom.css 旧副本的同特异性规则（同特异性后注入者赢）；通用 .katex:not(...)
 // (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式——这些块无 custom.css 公式
@@ -197,10 +199,15 @@ function normalizeFontName(name) {
   return String(name || '').replace(/["']/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
-// 自定义字体 + 回退链；空/非法返回 null（调用方回退默认栈）
+// 自定义字体 + 回退链；空/非法返回 null（调用方回退默认栈）。
+// 去掉回退栈里与已选字体同名的条目，避免链中重复（如 code=Consolas 与 CODE_FONT_STACK
+// 首项 Consolas 重复，生成 "Consolas", "Consolas", ...）
 function customFontChain(name, fallbacks) {
   const f = cleanFontName(name);
-  return f ? `"${f}", ${fallbacks}` : null;
+  if (!f) return null;
+  const nf = normalizeFontName(f);
+  const deduped = fallbacks.split(',').map((s) => s.trim()).filter((entry) => normalizeFontName(entry) !== nf).join(', ');
+  return `"${f}", ${deduped}`;
 }
 
 // 把设置编译成追加注入的 CSS（排在 default.css / custom.css 之后，优先级最高）
