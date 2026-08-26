@@ -15,11 +15,14 @@
       .map((c) => ({ combo: c.combo, command: '' }));
   }
   // 将草稿行并回主进程刷新后的干净 slashCommands（去重 + 上限 10）
+  // 草稿只与已提交项（cleanList）去重，草稿之间不去重——add 一律填占位组合键
+  // Ctrl+Shift+X，多个新建行在用户改键前共用同一 combo，互相去重会误删其余新增行
   function mergeDrafts(cleanList, drafts) {
     const result = (Array.isArray(cleanList) ? cleanList : []).slice();
+    const committedCombos = new Set(result.map((c) => c && c.combo).filter(Boolean));
     for (const d of drafts) {
       if (result.length >= 10) break;
-      if (result.some((c) => c && c.combo === d.combo)) continue;
+      if (committedCombos.has(d.combo)) continue;
       result.push({ combo: d.combo, command: '' });
     }
     return result;

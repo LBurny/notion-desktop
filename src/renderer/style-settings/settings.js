@@ -5,9 +5,9 @@ let settings = window.settingsApi.get();
 let lang = window.i18n.resolveLanguage(settings.language, window.settingsApi.systemLocale());
 const t = (k) => window.i18n.t(lang, k);
 
-// 四个字体槽的占位符显示「前缀 + 内置默认名」；公式槽内置默认随本机已装字体模糊匹配
-// （同名文件安装名不一：Latin Modern Math / Modern Math / Modern 等），
-// 未装 Modern 系才显示 KaTeX_Main
+// 四个字体槽的占位符显示「前缀 + 内置默认名」；公式槽内置默认优先 Times New Roman
+// （Windows 几乎必装），未装才回落本机已装的 Modern 系（Latin Modern Math /
+// Modern Math / Modern 等），都没有才显示 KaTeX_Main
 function applyPlaceholders() {
   const prefix = t('style.defaultPrefix');
   $('font-body').placeholder = prefix + '思源宋体 CN';

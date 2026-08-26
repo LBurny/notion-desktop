@@ -39,6 +39,24 @@ test('mergeDrafts 跳过与已有有效项同 combo 的草稿（去重）', () =
   assert.deepStrictEqual(merged, [{ combo: 'Ctrl+Shift+X', command: 'math' }]);
 });
 
+test('mergeDrafts 草稿之间不去重：多个新建行共用占位 combo（add 一律 Ctrl+Shift+X）应全部存活', () => {
+  // 复现 bug：点「+ 添加」多次新增草稿行（combo 都是占位 Ctrl+Shift+X、命令空），
+  // 删除其中一条触发 commit → 主进程回播 language-changed → onLanguage 用
+  // extractDrafts + mergeDrafts 重建。草稿互相去重会把同 combo 的其余新增行误删。
+  const merged = mergeDrafts(
+    [{ combo: 'Ctrl+Shift+M', command: 'math' }],
+    [
+      { combo: 'Ctrl+Shift+X', command: '' },
+      { combo: 'Ctrl+Shift+X', command: '' },
+      { combo: 'Ctrl+Shift+X', command: '' },
+    ],
+  );
+  assert.strictEqual(merged.length, 4, '已提交 1 条 + 草稿 3 条全保留');
+  // 三个草稿都在
+  const drafts = merged.filter((c) => c.command === '');
+  assert.strictEqual(drafts.length, 3, '三个同 combo 草稿均存活');
+});
+
 test('mergeDrafts 总数上限 10（草稿不溢出）', () => {
   const clean = Array.from({ length: 9 }, (_, i) => ({ combo: `Ctrl+Shift+F${i + 1}`, command: 'c' }));
   const drafts = [

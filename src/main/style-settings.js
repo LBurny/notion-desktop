@@ -123,7 +123,9 @@ function saveSettings(filePath, settings) {
 // default.css 的副本，其字体规则排在 default.css 之后会盖住新栈，靠最后注入兜底
 const DEFAULT_FONT_STACK = '"思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif';
 const CODE_FONT_STACK = '"Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace';
-const MATH_FONT_STACK = '"KaTeX_Main", "Times New Roman", serif';
+// 公式回退栈（数组形式，便于与已选字体去重）：KaTeX_Main 补缺数学字形、Times New Roman
+// 补拉丁字形、serif 兜底。默认前置 Times New Roman 时，栈中同名条目会被去重避免冗余
+const MATH_FONT_FALLBACKS = ['"KaTeX_Main"', '"Times New Roman"', 'serif'];
 
 // 正文/界面选择器分组：两组合计与旧版统一 FONT_SELECTORS 完全同集（default.css 全局字体表
 // 的内容侧/界面侧拆分，默认外观零变化）。必须镜像完整选择器表，不能用 .notion-page-content *
@@ -170,14 +172,22 @@ const UI_SELECTORS = [
   '.notion-search', '.notion-search *',
 ].join(', ');
 const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *';
-// 公式内联规则必须复用 default.css 同特异性 (0,4,0) 的 :not 选择器（同特异性后注入者赢）；
-// 展示公式与浮层预览无竞争，直接覆盖
-const MATH_SELECTORS = '.notion-text-block .katex:not(.katex-display .katex), .notion-text-block .katex:not(.katex-display .katex) *, .katex-display .katex, .katex-display .katex *, [role="dialog"] .katex, [role="dialog"] .katex *';
+// 行内公式：.notion-text-block 专项 (0,4,0) 复用 default.css 同特异性 :not 选择器，
+// 压过 custom.css 旧副本的同特异性规则（同特异性后注入者赢）；通用 .katex:not(...)
+// (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式——这些块无 custom.css 公式
+// 规则，只需压过正文 [contenteditable="true"]:first-of-type * (0,2,0)。
+// 展示公式与浮层预览无竞争，直接覆盖。
+const MATH_SELECTORS = '.notion-text-block .katex:not(.katex-display .katex), .notion-text-block .katex:not(.katex-display .katex) *, .katex:not(.katex-display .katex), .katex:not(.katex-display .katex) *, .katex-display .katex, .katex-display .katex *, [role="dialog"] .katex, [role="dialog"] .katex *';
 
 // 自定义字体名过滤引号/反斜杠（防 CSS 注入）
 function cleanFontName(name) {
   if (typeof name !== 'string') return '';
   return name.trim().replace(/["\\]/g, '');
+}
+
+// 字体名归一化（去引号/转小写/去非字母数字）用于回退栈去重比较
+function normalizeFontName(name) {
+  return String(name || '').replace(/["']/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 // 自定义字体 + 回退链；空/非法返回 null（调用方回退默认栈）
@@ -211,13 +221,17 @@ function buildSettingsCss(s, installedFonts) {
   if (codeChain || cleanFontName(s.fonts.body) || cleanFontName(s.fonts.ui)) {
     css += `${CODE_SELECTORS} { font-family: ${codeChain || CODE_FONT_STACK} !important; }\n`;
   }
-  // 公式：math 槽自定义时用用户字体；留空（内置默认）时优先本机已装的 Modern 系
-  // 数学字体——同款字体在不同机器安装名不一（Latin Modern Math / Modern Math /
-  // Latin Modern Roman / Modern），按名称模糊匹配，未装任何 Modern 系才完全交给
-  // default.css 的 KaTeX_Main 默认（维持现状）；链尾垫 KaTeX_Main 防缺字形出方框。
-  // 用户字体只清洗一次（再经 customFontChain 二次 trim 会裁掉清洗后残留的空格）
+  // 公式：math 槽自定义时用用户字体；留空（内置默认）时优先 Times New Roman
+  // （Windows 几乎必装，与正文拉丁字体一致），未装才回落本机已装的 Modern 系数学字体
+  // ——同款字体在不同机器安装名不一（Latin Modern Math / Modern Math / Latin Modern
+  // Roman / Modern），按名称模糊匹配；Times New Roman 与 Modern 系都没装才完全交给
+  // default.css 的 KaTeX_Main 默认。链尾垫 KaTeX_Main 防缺字形出方框。
+  // 用户字体只清洗一次（再经 customFontChain 二次 trim 会裁掉清洗后残留的空格）；
+  // 回退栈与已选字体去重，避免默认 Times New Roman 在链中重复出现
   const mathFont = cleanFontName(s.fonts.math) || cleanFontName(pickMathDefaultFont(installedFonts));
-  const mathChain = mathFont ? `"${mathFont}", ${MATH_FONT_STACK}` : null;
+  const mathChain = mathFont
+    ? `"${mathFont}", ${MATH_FONT_FALLBACKS.filter((f) => normalizeFontName(f) !== normalizeFontName(mathFont)).join(', ')}`
+    : null;
   if (mathChain) {
     css += `${MATH_SELECTORS} { font-family: ${mathChain} !important; }\n`;
   }

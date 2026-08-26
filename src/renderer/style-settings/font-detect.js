@@ -19,18 +19,24 @@
     return candidates.filter((f) => isAvailable(f));
   }
 
-  // 公式内置默认优先 Modern 系数学字体：同款字体在不同机器的安装名不一
-  // （Latin Modern Math / Modern Math / Latin Modern Roman / Modern 等），
-  // 按已装字体名模糊匹配——名字必须含 modern 才算 Modern 系（Cambria Math 等
-  // 非 Modern 系的数学字体不参与，否则 Windows 必装的 Cambria Math 会抢位），
-  // 系内含 math 的数学字族最优先，Latin Modern 次之，其余含 modern 的名字
-  // （如 Computer Modern）最后；返回 null 表示未装任何
-  // Modern 系（调用方回落 KaTeX_Main 默认栈，维持 default.css 现状）
+  // 公式内置默认字体：优先 Times New Roman（Windows 几乎必装，与正文拉丁字体一致）；
+  // 未装才回落 Modern 系数学字体——同款字体在不同机器的安装名不一
+  // （Latin Modern Math / Modern Math / Latin Modern Roman / Modern），按已装字体名
+  // 模糊匹配，名字必须含 modern 才算 Modern 系（Cambria Math 等非 Modern 系的数学字体
+  // 不参与，否则 Windows 必装的 Cambria Math 会抢位），系内含 math 的数学字族最优先、
+  // Latin Modern 次之、其余含 modern 的名字（如 Computer Modern）最后；
+  // 返回 null 表示 Times New Roman 与 Modern 系均未装（调用方回落 KaTeX_Main 默认栈）
   function pickMathDefaultFont(fontNames) {
     const norm = (n) => String(n || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const list = fontNames || [];
+    // 优先 Times New Roman：取首个精确匹配的原始名（保留用户机器上的实际写法）
+    for (const name of list) {
+      if (norm(name) === 'times new roman') return name;
+    }
+    // 回落：Modern 系数学字体模糊匹配
     let best = null;
     let bestScore = 0;
-    for (const name of fontNames || []) {
+    for (const name of list) {
       const n = norm(name);
       if (!n) continue;
       let score = 0;

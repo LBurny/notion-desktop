@@ -63,8 +63,12 @@ h1 *,
 }
 
 /* ========== 公式统一使用数学字体 ========== */
+/* 行内公式：.notion-text-block 专项 (0,4,0) 压过 custom.css 旧副本；通用 .katex:not(...)
+   (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式（压过正文 0,2,0） */
 .notion-text-block .katex:not(.katex-display .katex),
-.notion-text-block .katex:not(.katex-display .katex) * {
+.notion-text-block .katex:not(.katex-display .katex) *,
+.katex:not(.katex-display .katex),
+.katex:not(.katex-display .katex) * {
   font-family: "KaTeX_Main", "Times New Roman", serif !important;
 }
 
