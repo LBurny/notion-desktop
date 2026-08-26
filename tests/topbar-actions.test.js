@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
-  favoriteStateOf, quickFindStateOf, uiFontOf, UI_FONT_SELECTORS,
+  favoriteStateOf, quickFindStateOf, uiFontOf, UI_FONT_SELECTORS, spaNavigate,
 } = require('../src/main/topbar-actions');
 
 // 极简 DOM stub：按选择器表命中预设元素
@@ -100,6 +100,15 @@ test('toggleRunner：按钮懒挂载时重试直到挂载后生效（☰ 收不�
   assert.equal(page.closeClicks, 1, '挂载后只点一次');
 });
 
+test('toggleRunner：退避前期密集（n=0→50, n=1→70, n=2→130）', async () => {
+  const sleeps = [];
+  const { root } = stubSidebarPage({ x: -250, openMounted: false });
+  const sleep = (ms) => { sleeps.push(ms); return Promise.resolve(); };
+  const toggle = createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot: () => root, sleep, maxAttempts: 3 });
+  await toggle(TOPBAR_ACTIONS.sidebar);
+  assert.deepStrictEqual(sleeps, [50, 70, 130]);
+});
+
 test('toggleRunner：按钮始终不挂载时有限次放弃，不无限重试', async () => {
   const { page, root } = stubSidebarPage({ x: -250, openMounted: false });
   const toggle = createSidebarToggleRunner({
@@ -169,4 +178,21 @@ test('uiFontOf 页面未就绪或字体为空时返回 null', () => {
   const el = {};
   assert.strictEqual(uiFontOf(stubDoc({ [UI_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '' })), null);
   assert.strictEqual(uiFontOf(stubDoc({ [UI_FONT_SELECTORS[0]]: el }), () => ({ fontFamily: '   ' })), null);
+});
+
+test('spaNavigate：notion.so URL 注入隐藏锚点并 click', () => {
+  const clicks = [];
+  const doc = {
+    createElement: () => ({ click: () => clicks.push('click'), style: {} }),
+    body: { appendChild() {}, removeChild() {} },
+  };
+  assert.strictEqual(spaNavigate(doc, 'https://www.notion.so/Page-x'), true);
+  assert.deepStrictEqual(clicks, ['click']);
+});
+
+test('spaNavigate：非 notion.so URL / 缺 body / 空 URL 直接拒绝', () => {
+  const doc = { createElement: () => ({ click() {}, style: {} }), body: { appendChild() {}, removeChild() {} } };
+  assert.strictEqual(spaNavigate(doc, 'https://evil.com/x'), false);
+  assert.strictEqual(spaNavigate({ createElement: () => ({}) }, 'https://www.notion.so/x'), false);
+  assert.strictEqual(spaNavigate(doc, ''), false);
 });

@@ -86,12 +86,17 @@ async function main() {
   const initialCount = await evalOn(tb, tabCountExpr);
   console.log(`启动恢复标签数: ${initialCount}, 标题: ${await evalOn(tb, allTitlesExpr)}`);
   const pages1 = (await targets()).filter((x) => x.type === 'page' && x.url.startsWith('https://www.notion.so'));
-  check('懒加载（仅活动标签建视图）', pages1.length, 1);
-  check('活动标签标题已同步（非占位符）', (await evalOn(tb, activeTitleExpr)) !== '加载中…', true);
+  // 预热视图也作为 notion.so 页面目标出现在 /json 中：按标题栏活动标签标题精确选中
+  // originPage（活动标签），避免误选 detached 预热视图。标题未同步时回退首个。
+  const cleanT = (t) => (t || '').replace(/\s*\|\s*Notion$/, '').trim();
+  const activeTitle = cleanT(await evalOn(tb, activeTitleExpr));
+  const originPage = (activeTitle && pages1.find((p) => cleanT(p.title) === activeTitle)) || pages1[0];
+  // 启动期仅活动标签建视图（懒加载）+ 至多一个预热视图 → 1 或 2 个 notion 页面目标
+  check('懒加载（活动标签 + 可选预热视图）', pages1.length === 1 || pages1.length === 2, true);
+  check('活动标签标题已同步（非占位符）', activeTitle !== '加载中…', true);
 
   // 1) 新建搜索：官方逻辑——在当前页唤起 Quick Find，此刻不开新标签
   // 优先真实按键 ^t（验 BIE 链路）；Windows 焦点策略吞键时退化为 CDP 点击“+”按钮（同一条 IPC）
-  const originPage = pages1[0];
   const op = await attach(originPage.webSocketDebuggerUrl);
   // 冷启动首载很慢：等 Notion 应用就绪再触发，否则注入的 ctrl+k 会被丢弃
   for (let i = 0; i < 40; i++) {
@@ -134,6 +139,26 @@ async function main() {
   const pickedActive = await evalOn(tb, activeIdExpr);
   check('新标签为活动标签（追加在末尾）', pickedActive, await evalOn(tb, idAtExpr(initialCount)));
   op.close();
+
+  // 3b) 预热命中观察（只读、非致命）：新标签若经 SPA 内导航（认领预热视图），
+  // CDP 导航历史首条为首页 URL；冷加载则首条即目标 URL。预热就绪时期望前者；
+  // 未就绪允许后者。仅为诊断信息，不计入失败。
+  const pickedTargets = (await targets()).filter((x) => x.type === 'page' && x.url.startsWith('https://www.notion.so'));
+  const pickedTitle = cleanT(await evalOn(tb, activeTitleExpr));
+  const pickedPage = (pickedTitle && pickedTargets.find((p) => cleanT(p.title) === pickedTitle)) || pickedTargets[pickedTargets.length - 1];
+  if (pickedPage) {
+    try {
+      const pc = await attach(pickedPage.webSocketDebuggerUrl);
+      await pc.send('Page.enable');
+      const hist = await pc.send('Page.getNavigationHistory');
+      const firstUrl = hist.entries[0] && hist.entries[0].url;
+      const viaStandby = !!firstUrl && /^https:\/\/(www\.)?notion\.so\/?(\?|#|$)/.test(firstUrl) && firstUrl !== pickedPage.url;
+      console.log(`${viaStandby ? 'PASS' : 'INFO'} 新标签导航路径：${viaStandby ? 'SPA 内导航（认领预热视图）' : '全量加载（预热未就绪回退，或首条即目标页）'}`);
+      pc.close();
+    } catch (e) {
+      console.log(`INFO 新标签导航路径检查跳过：${e.message}`);
+    }
+  }
 
   // 3) Ctrl+PageDown 切回上一个（Ctrl+Tab/PageDown 是 Chromium 保留键，走聚焦期全局快捷键）
   // 注意按 data-id 比较：多个标签可能同标题，标题比较会假阴性

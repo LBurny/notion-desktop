@@ -5,7 +5,7 @@ const path = require('path');
 
 const BEGIN = '// [probes:generated begin]';
 const END = '// [probes:generated end]';
-const FUNCS = ['pickTopbarButton', 'sidebarStateOf', 'createSidebarToggleRunner', 'favoriteStateOf', 'quickFindStateOf', 'uiFontOf'];
+const FUNCS = ['pickTopbarButton', 'sidebarStateOf', 'createSidebarToggleRunner', 'favoriteStateOf', 'quickFindStateOf', 'uiFontOf', 'spaNavigate'];
 
 function buildBlock() {
   const m = require('../src/main/topbar-actions');
