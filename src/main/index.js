@@ -2,6 +2,15 @@
 try { require('node:module').enableCompileCache(); } catch { /* 无此 API 时忽略 */ }
 const path = require('path');
 const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, screen, nativeTheme, Tray, Menu, globalShortcut, session } = require('electron');
+
+// 单实例锁：尽早检查（在加载其余模块之前），第二实例立刻 app.exit 退出。
+// app.exit(0) 比 app.quit 更快——跳过所有退出事件直接终止进程，
+// 避免第二实例短暂存活导致可见闪烁/任务栏闪现
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.exit(0);
+}
+
 const { createPerf } = require('./perf');
 const { loadState, isVisibleOnSomeDisplay, trackWindow } = require('./window-state');
 const { ensureCustomCss, createCssProvider, watchCustomCss } = require('./css-manager');
@@ -19,7 +28,6 @@ const { createSettingsWindows } = require('./settings-windows');
 const { attachRequestFilter } = require('./request-filter');
 const { resolveTrayAction } = require('./tray-actions');
 const { syncLoginItem, shouldStartHidden } = require('./login-item');
-const { secondInstanceAction } = require('./single-instance');
 const { resolveLanguage } = require('../renderer/shared/i18n');
 
 const NOTION_URL = 'https://www.notion.so/';
@@ -208,22 +216,15 @@ function createWindow({ startHidden = false } = {}) {
   });
 }
 
-// 单实例锁：已运行时第二实例（双击桌面快捷方式）直接唤起第一实例主窗并退出，
-// 不启动新进程造成卡顿。lock 必须在 app.whenReady 之前请求
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
+// 单实例锁已在文件顶部尽早获取（gotTheLock）；第二实例已 app.exit(0) 退出。
+// 此处仅为第一实例注册 second-instance 处理器：唤起主窗（托盘隐藏则 show，
+// 最小化则 restore，已可见则 focus），不重复调 show+focus 避免抖动
+if (gotTheLock) {
   app.on('second-instance', () => {
-    if (!win) return;
-    const action = secondInstanceAction({
-      destroyed: win.isDestroyed(),
-      minimized: win.isMinimized(),
-      visible: win.isVisible(),
-    });
-    if (action.restore) win.restore();
-    if (action.show) win.show();
-    if (action.focus) win.focus();
+    if (!win || win.isDestroyed()) return;
+    if (win.isMinimized()) win.restore();
+    else if (!win.isVisible()) win.show();
+    else win.focus();
   });
 }
 
