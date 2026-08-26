@@ -1,7 +1,6 @@
 // V8 编译缓存：加速冷启动的模块编译（Node 22.1+；旧运行时静默跳过）
 try { require('node:module').enableCompileCache(); } catch { /* 无此 API 时忽略 */ }
 const path = require('path');
-const fs = require('fs');
 const { app, BaseWindow, BrowserWindow, WebContentsView, ipcMain, screen, nativeTheme, Tray, Menu, globalShortcut, session } = require('electron');
 
 // 单实例锁：尽早检查（在加载其余模块之前），第二实例立刻 app.exit 退出。
@@ -61,13 +60,8 @@ const TRAY_MENU_SIZE = { width: 150, height: 160 };
 
 // ND_PERF=1 时输出启动/加载里程碑耗时
 const perf = createPerf({ enabled: !!process.env.ND_PERF });
-// DWM 深色非客户区调用结果观测：失败也走此通道。始终追加到 userData/nd-dwm.log
-// （调用频率极低，日志很小），ND_PERF=1 时同步打印控制台——打包版看不到控制台，
-// 文件日志是唯一排查手段（跨机器白线问题排查用）。
-const dwmLog = (m) => {
-  try { fs.appendFileSync(path.join(app.getPath('userData'), 'nd-dwm.log'), `${new Date().toISOString()} ${m}\n`); } catch {}
-  if (process.env.ND_PERF) console.log(m);
-};
+// DWM 深色非客户区调用结果观测：仅在 ND_PERF=1 时输出 [dwm] 行
+const dwmLog = (m) => { if (process.env.ND_PERF) console.log(m); };
 
 let settingsWindows = null;
 
@@ -212,7 +206,6 @@ function createWindow({ startHidden = false } = {}) {
   perf.mark('window-created');
   // 启动时按当前主题设一次深色非客户区（消除 Win10 无边框窗口最大化时 1px 白边）；
   // 后续主题切换由 themeService.onApplied 同步
-  dwmLog(`[theme] window-created theme=${themeService.get()}`);
   applyWindowDarkMode(win, themeService.get(), { log: dwmLog });
 
   win.on('maximize', () => titlebarView.webContents.send('window-maximized', true));
@@ -258,7 +251,6 @@ app.whenReady().then(() => {
     themeFile,
     initial: loadTheme(themeFile) || (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
     onApplied: (theme) => {
-      dwmLog(`[theme] onApplied theme=${theme} window=${!!win} tabs=${!!tabs}`);
       broadcastTheme(theme);
       if (win) win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
       if (win) applyWindowDarkMode(win, theme, { log: dwmLog }); // 单窗口深色非客户区：消除 Win10 无边框窗口最大化时 DWM 残留的 1px 白边

@@ -1,6 +1,6 @@
 {
   "name": "notion-desktop",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "private": true,
   "description": "Notion 桌面套壳：主题跟随 + CSS 注入",
   "main": "src/main/index.js",
