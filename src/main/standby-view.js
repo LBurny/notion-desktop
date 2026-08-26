@@ -21,16 +21,19 @@ function createStandbyView({ partition, preloadPath, homeUrl, getCss, getTheme }
     });
     v.setBackgroundColor(themeBackground(getTheme()));
     const wc = v.webContents;
+    // 认领后 view 置空/重建，但这些处理器仍挂在 wc 上。用 v !== view 闸口确保它们
+    // 只在仍是当前预热视图时生效——否则认领后该视图成为标签页，其后续加载会误注入 CSS /
+    // 误改预热状态 / 误 close 销毁标签视图（v0.2.3「Can't add a destroyed child view」根因）。
     wc.on('dom-ready', () => {
-      if (wc.isDestroyed()) return;
+      if (v !== view || wc.isDestroyed()) return;
       wc.insertCSS(getCss(), { cssOrigin: 'author' })
         .then((k) => { cssKey = k; })
         .catch(() => {});
     });
-    wc.on('did-finish-load', () => { warming = false; ready = true; });
+    wc.on('did-finish-load', () => { if (v !== view) return; warming = false; ready = true; });
     // 首页加载失败：清理以便 rewarm 重试，避免永久卡 warming=true 阻断后续预热
     wc.on('did-fail-load', (_e, _code, _desc, _url, isMainFrame) => {
-      if (!isMainFrame) return;
+      if (!isMainFrame || v !== view) return;
       if (!wc.isDestroyed()) wc.close();
       reset();
     });

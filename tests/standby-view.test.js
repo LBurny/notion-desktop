@@ -9,7 +9,7 @@ function setup({ theme = 'dark' } = {}) {
   class Wc {
     constructor() { this._url = 'https://www.notion.so/'; this._k = 0; this._loads = 0; }
     loadURL(u) { this._url = u; this._loads++; }
-    on(ev, fn) { if (ev === 'did-finish-load') this._finish = fn; if (ev === 'dom-ready') this._dom = fn; }
+    on(ev, fn) { if (ev === 'did-finish-load') this._finish = fn; if (ev === 'dom-ready') this._dom = fn; if (ev === 'did-fail-load') this._fail = fn; }
     once() {}
     send() {}
     insertCSS() { return Promise.resolve('k' + ++this._k); }
@@ -129,4 +129,20 @@ test('dispose 销毁视图并清状态', () => {
 test('reinjectCss 无视图时 no-op（不抛）', () => {
   const { sb } = setup();
   assert.doesNotThrow(() => sb.reinjectCss(() => 'css'));
+});
+
+// 认领后残留的 did-fail-load 不应再 close 销毁视图（v0.2.3「Can't add a destroyed child view」根因）
+test('认领后残留 did-fail-load 不再销毁视图、不污染预热状态', async () => {
+  const { sb, created } = setup();
+  sb.warm();
+  const wc = created[0].webContents;
+  wc._dom(); wc._finish();
+  await new Promise((r) => setTimeout(r, 10));
+  sb.claim(); // 认领，view 置空
+  let closed = false;
+  wc.close = () => { closed = true; };
+  // 模拟认领后该视图作为标签页发生主帧加载失败
+  wc._fail({}, 1, '', 'https://www.notion.so/Page1', true);
+  assert.equal(closed, false, '认领后残留 did-fail-load 不应 close 销毁视图');
+  assert.equal(sb.isReady(), false, '预热状态不被残留处理器污染');
 });

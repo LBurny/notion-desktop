@@ -104,7 +104,10 @@ function createTabs(deps) {
   }
 
   function ensureView(rec) {
-    if (rec.view) return rec.view;
+    // 视图可能因崩溃/异常被销毁（如预热视图认领后残留处理器的早期 bug）：若已销毁则置空重建，
+    // 避免 attachActive 的 addChildView 拿到已销毁视图抛 "Can't add a destroyed child view"
+    if (rec.view && rec.view.webContents && !rec.view.webContents.isDestroyed()) return rec.view;
+    rec.view = null; rec.cssKey = null;
     // 优先认领预热视图（已加载首页 + CSS 注入）：经 Notion 客户端路由瞬时跳转，
     // 避免冷加载整个 SPA。未就绪回退下方冷加载，无回归。
     const claimed = standby.claim();

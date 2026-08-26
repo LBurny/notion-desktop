@@ -192,3 +192,17 @@ test('Ctrl+T 触发 new-tab 动作不抛 ReferenceError', () => {
     wc._bie({ preventDefault() {} }, { type: 'keyDown', control: true, key: 't' });
   }, 'Ctrl+T 不应抛 ReferenceError');
 });
+
+// ── 视图销毁防御：ensureView 重建已销毁视图，避免 addChildView 抛 "destroyed child view" ──
+test('ensureView：活动视图已销毁则重建（不抛 destroyed child view）', () => {
+  const { tabs, created } = setup();
+  tabs.newTab('https://www.notion.so/Page1'); // tab1
+  const id1 = tabs.payload().tabs[0].id;
+  tabs.newTab('https://www.notion.so/Page2'); // tab2 变活动，tab1 留有视图
+  // 模拟 tab1 视图被异常销毁
+  created[0].webContents.isDestroyed = () => true;
+  created.length = 0;
+  assert.doesNotThrow(() => tabs.activateTab(id1), '激活已销毁视图的标签不应抛');
+  assert.equal(created.length, 1, '已销毁视图应重建（认领预热或冷加载）');
+  assert.equal(tabs.activeView().webContents.isDestroyed(), false, '新视图未销毁');
+});
