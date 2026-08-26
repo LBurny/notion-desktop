@@ -60,6 +60,8 @@ const TRAY_MENU_SIZE = { width: 150, height: 160 };
 
 // ND_PERF=1 时输出启动/加载里程碑耗时
 const perf = createPerf({ enabled: !!process.env.ND_PERF });
+// DWM 深色非客户区调用结果观测：仅在 ND_PERF 时输出 [dwm] 行，失败也走此通道
+const dwmLog = (m) => { if (process.env.ND_PERF) console.log(m); };
 
 let settingsWindows = null;
 
@@ -204,7 +206,7 @@ function createWindow({ startHidden = false } = {}) {
   perf.mark('window-created');
   // 启动时按当前主题设一次深色非客户区（消除 Win10 无边框窗口最大化时 1px 白边）；
   // 后续主题切换由 themeService.onApplied 同步
-  applyWindowDarkMode(win, themeService.get());
+  applyWindowDarkMode(win, themeService.get(), { log: dwmLog });
 
   win.on('maximize', () => titlebarView.webContents.send('window-maximized', true));
   win.on('unmaximize', () => titlebarView.webContents.send('window-maximized', false));
@@ -251,7 +253,7 @@ app.whenReady().then(() => {
     onApplied: (theme) => {
       broadcastTheme(theme);
       if (win) win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
-      if (win) applyWindowDarkMode(win, theme); // 单窗口深色非客户区：消除 Win10 无边框窗口最大化时 DWM 残留的 1px 白边
+      if (win) applyWindowDarkMode(win, theme, { log: dwmLog }); // 单窗口深色非客户区：消除 Win10 无边框窗口最大化时 DWM 残留的 1px 白边
       if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
     },
   });

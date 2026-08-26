@@ -4,7 +4,9 @@ const {
   applyWindowDarkMode,
   buildScript,
   hwndToLong,
+  parseStatus,
   DWMWA_USE_IMMERSIVE_DARK_MODE,
+  DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY,
 } = require('../src/main/window-dark-mode');
 
 function fakeWin(hwndNum = 291) {
@@ -93,4 +95,72 @@ test('非 win32 平台不调用 exec', () => {
   const ok = applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, platform: 'darwin' });
   assert.strictEqual(ok, false);
   assert.strictEqual(called, false);
+});
+
+// ---- 跨机器普适性：属性 20 → 19 兜底 + 返回值不再吞 ----
+
+test('DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY 为 19（Win10 1909 及更早编号）', () => {
+  assert.strictEqual(DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY, 19);
+});
+
+test('buildScript 先试属性 20，返回非 0 才退属性 19', () => {
+  const ps = buildScript('291', 1);
+  assert.ok(ps.includes('$r20 = [DwmApi]::DwmSetWindowAttribute($h, 20, [ref]$v, 4)'), '应先试属性 20');
+  assert.ok(ps.includes('$r19 = [DwmApi]::DwmSetWindowAttribute($h, 19, [ref]$v, 4)'), '应退属性 19');
+  // 20 成功即收手，不再碰 19
+  assert.ok(ps.includes('if ($r20 -eq 0)'), '应以 $r20 == 0 为收手判据');
+});
+
+test('buildScript 不再用 Out-Null 吞掉 DwmSetWindowAttribute 返回值', () => {
+  const ps = buildScript('291', 1);
+  assert.ok(!/DwmSetWindowAttribute[^]*\|\s*Out-Null/.test(ps), '不应再对 DwmSetWindowAttribute 用 Out-Null');
+});
+
+test('buildScript 成功路径回写 nd-dwm ok 状态行', () => {
+  const ps = buildScript('291', 1);
+  assert.ok(ps.includes('nd-dwm ok attr=20'), '20 成功应回写 attr=20');
+  assert.ok(ps.includes('nd-dwm ok attr=19'), '19 兜底成功应回写 attr=19');
+});
+
+test('buildScript 两属性都失败时回写 nd-dwm fail 带 HRESULT', () => {
+  const ps = buildScript('291', 1);
+  assert.ok(ps.includes('nd-dwm fail r20=$r20 r19=$r19'), '失败行应带两个返回码');
+});
+
+// ---- parseStatus ----
+
+test('parseStatus 解析 nd-dwm 行，忽略其余输出', () => {
+  assert.strictEqual(parseStatus('foo\r\nnd-dwm ok attr=20\r\nbar'), 'nd-dwm ok attr=20');
+  assert.strictEqual(parseStatus('nd-dwm fail r20=1 r19=1 cp=1'), 'nd-dwm fail r20=1 r19=1 cp=1');
+  assert.strictEqual(parseStatus(''), null);
+  assert.strictEqual(parseStatus(undefined), null);
+  assert.strictEqual(parseStatus('no marker here'), null);
+});
+
+// ---- exec 回调回报 ----
+
+test('applyWindowDarkMode 成功时通过 log 回报状态', () => {
+  let logged = null;
+  const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, 'nd-dwm ok attr=20\r\n', ''); };
+  applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, log: (m) => { logged = m; } });
+  assert.strictEqual(logged, '[dwm] nd-dwm ok attr=20');
+});
+
+test('applyWindowDarkMode 两属性失败时 log 带 r20/r19（及可能的 cp）', () => {
+  let logged = null;
+  const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, 'nd-dwm fail r20=1 r19=1 cp=1\r\n', ''); };
+  applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, log: (m) => { logged = m; } });
+  assert.ok(logged.includes('r20=1') && logged.includes('r19=1') && logged.includes('cp=1'), logged);
+});
+
+test('applyWindowDarkMode 无状态行且无 err 时不调 log', () => {
+  let logged = null;
+  const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, '', ''); };
+  applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, log: (m) => { logged = m; } });
+  assert.strictEqual(logged, null);
+});
+
+test('applyWindowDarkMode 默认 log 为空函数也不抛', () => {
+  const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, 'nd-dwm ok attr=19\r\n', ''); };
+  assert.strictEqual(applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec }), true);
 });

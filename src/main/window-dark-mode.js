@@ -1,12 +1,21 @@
 // 单窗口深色非客户区：消除 Win10 无边框窗口（frame:false）最大化时
 // DWM 残留的 1px 白边——系统浅色模式下该 1px 为白色，深色模式下不可见。
 // 通过 DWMWA_USE_IMMERSIVE_DARK_MODE 让本窗口非客户区走深色，不动系统主题、
-// 不影响其他程序。属性值 20 适用于 Win10 2004+（build 19041+，22H2=19045）。
+// 不影响其他程序。
+//
+// 跨机器普适性（曾踩坑：只发属性 20 在 build<19041 的机器上静默失效）：
+// - 属性号在 Win10 2004（build 19041+）为 20，更早版本为 19。脚本先试 20，
+//   返回非 0 再退 19，两种版本都覆盖。
+// - 不再用 | Out-Null 吞返回值：脚本回写一行 nd-dwm 状态（含 HRESULT），
+//   主进程按 log 回调输出，失败不再静默。
+// - 顺带回读 ColorPrevalence：用户开了"在窗口边框显示强调色"时边框会走系统
+//   强调色而盖过本属性，失败行带 cp=<val> 提示，便于现场定位"为何没生效"。
 // 沿用项目既有 PowerShell 调用链路（slash-commands.js），不引入 ffi 原生依赖；
 // 仅在启动/主题切换时调用，频率低，进程开销可忽略。
 const { execFile } = require('child_process');
 
-const DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+const DWMWA_USE_IMMERSIVE_DARK_MODE = 20;        // Win10 2004+（build 19041+）
+const DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY = 19; // Win10 1909 及更早
 
 function hwndToLong(win) {
   const buf = win.getNativeWindowHandle();
@@ -27,11 +36,29 @@ function buildScript(hwndLong, dark) {
     'Add-Type -TypeDefinition $code -Language CSharp',
     `$h = [IntPtr]::new([long]'${hwndLong}')`,
     `$v = ${dark}`,
-    `[DwmApi]::DwmSetWindowAttribute($h, ${DWMWA_USE_IMMERSIVE_DARK_MODE}, [ref]$v, 4) | Out-Null`,
+    '$r20 = [DwmApi]::DwmSetWindowAttribute($h, 20, [ref]$v, 4)',
+    'if ($r20 -eq 0) {',
+    '  "nd-dwm ok attr=20"',
+    '} else {',
+    '  $r19 = [DwmApi]::DwmSetWindowAttribute($h, 19, [ref]$v, 4)',
+    '  if ($r19 -eq 0) {',
+    '    "nd-dwm ok attr=19"',
+    '  } else {',
+    '    $cp = (Get-ItemProperty "HKCU:\\Software\\Microsoft\\Windows\\DWM" -Name ColorPrevalence -ErrorAction SilentlyContinue).ColorPrevalence',
+    '    if ($null -ne $cp) { "nd-dwm fail r20=$r20 r19=$r19 cp=$cp" } else { "nd-dwm fail r20=$r20 r19=$r19" }',
+    '  }',
+    '}',
   ].join('\r\n');
 }
 
-function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform } = {}) {
+// 从 PowerShell stdout 中提取首个 nd-dwm 状态行；无则 null
+function parseStatus(stdout) {
+  if (!stdout) return null;
+  const line = String(stdout).split(/\r?\n/).find((l) => l.startsWith('nd-dwm'));
+  return line || null;
+}
+
+function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform, log = () => {} } = {}) {
   if (platform !== 'win32') return false;
   if (!win || typeof win.isDestroyed !== 'function' || win.isDestroyed()) return false;
   if (typeof win.getNativeWindowHandle !== 'function') return false;
@@ -42,9 +69,20 @@ function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.p
   exec('powershell',
     ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps],
     { windowsHide: true },
-    () => {}
+    (err, stdout) => {
+      const status = parseStatus(stdout);
+      if (status) log(`[dwm] ${status}`);
+      else if (err) log(`[dwm] error ${String(err).slice(0, 120)}`);
+    }
   );
   return true;
 }
 
-module.exports = { applyWindowDarkMode, buildScript, hwndToLong, DWMWA_USE_IMMERSIVE_DARK_MODE };
+module.exports = {
+  applyWindowDarkMode,
+  buildScript,
+  hwndToLong,
+  parseStatus,
+  DWMWA_USE_IMMERSIVE_DARK_MODE,
+  DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY,
+};
