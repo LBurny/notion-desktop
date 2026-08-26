@@ -28,7 +28,7 @@ test('saveSettings + loadSettings 往返一致', () => {
     fonts: { body: '思源宋体 CN', ui: '', code: 'JetBrains Mono', math: '' },
     lineHeight: 1.8, paragraphSpacing: 6, zoom: 1.05, hideHelp: true,
     dividerWidth: 2.5, align: 'center',
-    hotkeys: { zoomIn: 'Ctrl+Alt+Q', zoomOut: 'Ctrl+Alt+W', toggleWindow: 'Ctrl+Alt+E' },
+    hotkeys: { zoomIn: 'Ctrl+Alt+Q', zoomOut: 'Ctrl+Alt+W', toggleWindow: 'Ctrl+Alt+E', newTab: 'Ctrl+T', closeTab: 'Ctrl+W' },
     closeAction: 'quit', language: 'en', launchAtLogin: true,
     slashCommands: [{ combo: 'Ctrl+Shift+R', command: 'math' }],
   };

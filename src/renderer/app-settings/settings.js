@@ -11,7 +11,7 @@ function applyLang() {
 }
 
 function render() {
-  for (const name of ['zoomIn', 'zoomOut', 'toggleWindow']) {
+  for (const name of ['zoomIn', 'zoomOut', 'toggleWindow', 'newTab', 'closeTab']) {
     $('hk-' + name).value = settings.hotkeys[name];
   }
   $('close-tray').checked = settings.closeAction !== 'quit';
@@ -66,7 +66,7 @@ function attachCapture(input, get, set) {
   });
 }
 
-for (const name of ['zoomIn', 'zoomOut', 'toggleWindow']) {
+for (const name of ['zoomIn', 'zoomOut', 'toggleWindow', 'newTab', 'closeTab']) {
   attachCapture($('hk-' + name), () => settings.hotkeys[name], (c) => { settings.hotkeys[name] = c; });
 }
 

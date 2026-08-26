@@ -19,6 +19,7 @@ function createTabs(deps) {
     win, manager, homeUrl, partition, preloadPath, errorPagePath,
     getTitlebarHeight, // () => number，标题栏高度（随缩放变化）
     getCss, getZoom,
+    getHotkeys, // () => settings.hotkeys | null，可配置的标签快捷键（newTab/closeTab）
     getTheme, // () => 'dark' | 'light'，视图加载期底色（防深色主题白闪）
     getSlashCommands, // () => [{ combo, command }]，斜杠命令快捷键配置
     onChanged,   // (payload) => void，payload = { tabs, canAdd }
@@ -30,10 +31,9 @@ function createTabs(deps) {
 
   const records = new Map(); // id → { id, url, title, view: null, cssKey: null, reloaded: false }
 
-  // 预热视图：常驻一个已加载首页的 detached 视图，newTab 认领它并经 SPA 内导航
-  //（content.js 的 spa-navigate）瞬时跳转，避免冷加载整个 Notion SPA（实测 ~4.6s，
-  // 期间 Ctrl+K 被丢、☰ 按钮未挂载）。首标签 did-finish-load 后才预热，不抢启动带宽；
-  // 认领后后台重建保证下一个新标签同样秒开；主题/CSS 变化与退出时正确同步/销毁。
+  // 预热视图：常驻一个已加载首页的 detached 视图，newTab 认领它并经 SPA 内导航瞬时跳转，
+  // 避免冷加载整个 Notion SPA。认领后立即重注最新 CSS（修"设置不生效"：预热期间注入的
+  // CSS 可能落后于当前设置，watchdog 整页重载也会清空 author CSS）。认领后后台重建。
   let standbyWarmedOnce = false;
   const standby = createStandbyView({
     partition, preloadPath, homeUrl, getCss, getTheme,
@@ -104,32 +104,50 @@ function createTabs(deps) {
   }
 
   function ensureView(rec) {
-    // 视图可能因崩溃/异常被销毁（如预热视图认领后残留处理器的早期 bug）：若已销毁则置空重建，
-    // 避免 attachActive 的 addChildView 拿到已销毁视图抛 "Can't add a destroyed child view"
+    // 视图可能因崩溃/异常被销毁：若已销毁则置空重建，避免 attachActive 的 addChildView
+    // 拿到已销毁视图抛 "Can't add a destroyed child view"
     if (rec.view && rec.view.webContents && !rec.view.webContents.isDestroyed()) return rec.view;
     rec.view = null; rec.cssKey = null;
-    // 优先认领预热视图（已加载首页 + CSS 注入）：经 Notion 客户端路由瞬时跳转，
-    // 避免冷加载整个 SPA。未就绪回退下方冷加载，无回归。
+    // 优先认领预热视图（已加载首页）：经 Notion 客户端路由瞬时跳转，避免冷加载整个 SPA。
+    // 未就绪回退下方冷加载，无回归。
     const claimed = standby.claim();
     if (claimed) {
       rec.view = claimed.view;
       rec.cssKey = claimed.cssKey;
       wireViewEvents(rec);
-      claimed.view.webContents.setZoomFactor(getZoom());
-      standby.rewarm(); // 后台重建预热，保证下一个新标签同样秒开
       const wc = claimed.view.webContents;
+      wc.setZoomFactor(getZoom());
+      // 认领即重注最新 CSS：预热期间注入的 CSS 可能落后于当前设置（用户改过字体/主题等），
+      // 且 watchdog 整页重载会清空 author CSS——这里移除旧 key 重注最新，并注册 dom-ready
+      // 重注兜底整页重载，确保新页面的设置样式一定生效（修"新建页设置不生效"）。
+      const reinject = () => {
+        const pre = rec.cssKey ? wc.removeInsertedCSS(rec.cssKey).catch(() => {}) : Promise.resolve();
+        return pre.then(() => wc.insertCSS(getCss(), { cssOrigin: 'author' }))
+          .then((k) => {
+            rec.cssKey = k;
+            const active = manager.active();
+            if (active && records.get(active.id) === rec) relay.probeUiFont(rec);
+          })
+          .catch(() => {});
+      };
+      reinject();
+      wc.on('dom-ready', () => {
+        if (wc.isDestroyed()) return;
+        reinject();
+        wc.setZoomFactor(getZoom());
+      });
+      standby.rewarm(); // 后台重建预热，保证下一个新标签同样秒开
       if (normalizeNotionUrl(wc.getURL()) !== normalizeNotionUrl(rec.url)) {
         wc.send('spa-navigate', rec.url);
-        // 兜底：SPA 跳转改 location.href 但【不反映到 webContents.getURL()】（v0.2.0 翻车点：
-        // 旧实现用 getURL 比对，恒判未跳 → 1.5s 后整页重载，每个新标签都"先出来再重载"）。
-        // 改用 location.href 探针轮询：1.5s 内跳到目标即停；未跳则整页加载兜底。
+        // 兜底：SPA 跳转改 location.href 但不反映到 webContents.getURL()，用 location.href
+        // 探针轮询判定；1.5s 内跳到目标即停，未跳则整页加载兜底（dom-ready 会重注 CSS）
         const target = normalizeNotionUrl(rec.url);
         const t0 = Date.now();
         const poll = async () => {
           if (wc.isDestroyed()) return;
           const href = await queryWc(wc, 'location-href-query', null, 'location-href', 300);
           if (wc.isDestroyed()) return;
-          if (normalizeNotionUrl(href) === target) return; // SPA 生效
+          if (normalizeNotionUrl(href) === target) { reinject(); return; } // SPA 生效后再重注一次 CSS 压过新页异步 CSS
           if (Date.now() - t0 >= 1500) { wc.loadURL(rec.url); return; } // 兜底整页加载
           setTimeout(poll, 200);
         };
@@ -222,7 +240,7 @@ function createTabs(deps) {
       }
     });
     wc.on('before-input-event', (e, input) => {
-      const s = shortcutFor(input);
+      const s = shortcutFor(input, getHotkeys ? getHotkeys() : null);
       if (s) {
         e.preventDefault(); // 页面收不到这些键，避免与 Notion 编辑器快捷键冲突
         if (s.action === 'new-tab') flow.newTabInteractive();

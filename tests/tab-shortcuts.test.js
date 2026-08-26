@@ -26,3 +26,23 @@ test('非 keyDown / 无 Ctrl / 带 Alt / 未注册键 → null', () => {
   assert.strictEqual(shortcutFor(kd('x')), null);
   assert.strictEqual(shortcutFor(kd('0')), null);
 });
+
+test('可配置新建/关闭标签：按 settings.hotkeys 匹配', () => {
+  const hk = { newTab: 'Ctrl+T', closeTab: 'Ctrl+W' };
+  assert.deepStrictEqual(shortcutFor(kd('t'), hk), { action: 'new-tab' });
+  assert.deepStrictEqual(shortcutFor(kd('w'), hk), { action: 'close-tab' });
+});
+
+test('改键后旧键不触发，新键生效', () => {
+  const hk = { newTab: 'Ctrl+N', closeTab: 'Ctrl+E' };
+  assert.strictEqual(shortcutFor(kd('t'), hk), null, 'Ctrl+T 已改键，不再新建');
+  assert.strictEqual(shortcutFor(kd('w'), hk), null, 'Ctrl+W 已改键，不再关闭');
+  assert.deepStrictEqual(shortcutFor(kd('n'), hk), { action: 'new-tab' });
+  assert.deepStrictEqual(shortcutFor(kd('e'), hk), { action: 'close-tab' });
+});
+
+test('配置下 Ctrl+Tab/PageDown/数字位 仍可用且不受改键影响', () => {
+  const hk = { newTab: 'Ctrl+N', closeTab: 'Ctrl+E' };
+  assert.deepStrictEqual(shortcutFor(kd('Tab'), hk), { action: 'next-tab' });
+  assert.deepStrictEqual(shortcutFor(kd('1'), hk), { action: 'position', position: 1 });
+});

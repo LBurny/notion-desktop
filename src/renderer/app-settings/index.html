@@ -41,9 +41,17 @@
         <span class="name" data-i18n="settings.toggleWindow">显示 / 隐藏</span>
         <input id="hk-toggleWindow" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
       </label>
+      <label class="row">
+        <span class="name" data-i18n="settings.newTab">新建标签页</span>
+        <input id="hk-newTab" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
+      </label>
+      <label class="row">
+        <span class="name" data-i18n="settings.closeTab">关闭标签页</span>
+        <input id="hk-closeTab" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
+      </label>
       <div class="section" data-i18n="settings.slash">斜杠命令快捷键</div>
       <div id="slash-list"></div>
-      <div class="row"><button id="slash-add" type="button" data-i18n="settings.slashAdd">+ 添加</button></div>
+      <div class="row slash-row"><button id="slash-add" type="button" data-i18n="settings.slashAdd">+ 添加</button><span class="slash-del-gap"></span></div>
       <div class="section" data-i18n="settings.closeAction">关闭窗口时</div>
       <label class="row check">
         <input id="close-tray" type="radio" name="closeAction" value="tray" />

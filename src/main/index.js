@@ -256,14 +256,13 @@ app.whenReady().then(() => {
     },
   });
   // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）。
-  // 两页同宽 400（统一回落 baseWidth，设置页不再窄于样式页）；高度按内容贴合：
-  // 样式 585（表单 10 行+3 分区头+hint），设置 595（5 分区含启动/语言）；
+  // 两页同宽 400（统一回落 baseWidth，设置页不再窄于样式页）；高度一致 585：
   // #form 均可滚动兜底（shared/base-win.css），新增表单行不必再调基准高度
   settingsWindows = createSettingsWindows({
     baseWidth: 400,
     configs: {
       style: { height: 585, dir: 'style-settings' },
-      app: { height: 595, dir: 'app-settings' },
+      app: { height: 585, dir: 'app-settings' },
     },
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
     getTheme: () => themeService.get(),
@@ -306,6 +305,7 @@ app.whenReady().then(() => {
     getTitlebarHeight: titlebarHeightNow,
     getCss: currentCss,
     getZoom: () => (styleSettings ? styleSettings.zoom : 1),
+    getHotkeys: () => (styleSettings ? styleSettings.hotkeys : null),
     getTheme: () => themeService.get(),
     getSlashCommands: () => (styleSettings ? styleSettings.slashCommands : []),
     onUiFont: (font) => {

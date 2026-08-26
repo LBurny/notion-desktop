@@ -13,7 +13,9 @@ const DEFAULT_SETTINGS = {
   hotkeys: {
     zoomIn: 'Ctrl+Shift+=',      // 页面放大 1%
     zoomOut: 'Ctrl+Shift+-',     // 页面缩小 1%
-    toggleWindow: 'Ctrl+`',      // 显示 / 最小化到托盘
+    toggleWindow: 'Ctrl+`',     // 显示 / 最小化到托盘
+    newTab: 'Ctrl+T',           // 新建标签页（+ 按钮同源；before-input-event 走可配置匹配）
+    closeTab: 'Ctrl+W',         // 关闭当前标签页
   },
   closeAction: 'tray', // 'tray' = 最小化到托盘；'quit' = 退出程序
   language: 'auto',    // 界面语言：'auto' 跟随系统（非 zh 系统一律英文）/ 'zh-CN' / 'en'
