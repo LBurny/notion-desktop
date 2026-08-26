@@ -19,7 +19,8 @@
       "package.json"
     ],
     "asarUnpack": [
-      "assets/tray.png"
+      "assets/tray.png",
+      "node_modules/@koromix/**"
     ],
     "win": {
       "target": "nsis"
@@ -39,5 +40,8 @@
   "devDependencies": {
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "koffi": "^3.1.6"
   }
 }

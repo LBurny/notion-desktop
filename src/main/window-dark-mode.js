@@ -3,19 +3,28 @@
 // 通过 DWMWA_USE_IMMERSIVE_DARK_MODE 让本窗口非客户区走深色，不动系统主题、
 // 不影响其他程序。
 //
-// 跨机器普适性（曾踩坑：只发属性 20 在 build<19041 的机器上静默失效）：
-// - 属性号在 Win10 2004（build 19041+）为 20，更早版本为 19。脚本先试 20，
-//   返回非 0 再退 19，两种版本都覆盖。
-// - 不再用 | Out-Null 吞返回值：脚本回写一行 nd-dwm 状态（含 HRESULT），
-//   主进程按 log 回调输出，失败不再静默。
-// - 顺带回读 ColorPrevalence：用户开了"在窗口边框显示强调色"时边框会走系统
-//   强调色而盖过本属性，失败行带 cp=<val> 提示，便于现场定位"为何没生效"。
-// 沿用项目既有 PowerShell 调用链路（slash-commands.js），不引入 ffi 原生依赖；
-// 仅在启动/主题切换时调用，频率低，进程开销可忽略。
+// 跨机器普适性（曾踩坑）：
+// - 属性号在 Win10 2004（build 19041+）为 20，更早版本为 19。先试 20，失败退 19。
+// - 早期用 PowerShell Add-Type 内联编译 C# 调 DWM，但部分机器上 Add-Type 编译失败
+//   （受限语言模式 CLM / 缺 csc.exe / 安全软件拦截），[DwmApi] 类型不存在，
+//   DwmSetWindowAttribute 抛「找不到类型」非终止错误，返回值留空 → 白边残留。
+//   现改用 koffi 原生 FFI（N-API 预编译，不依赖 .NET 编译器、不受 CLM 限制）
+//   直接从主进程调 DwmSetWindowAttribute；koffi 加载失败才回退 PowerShell 链路。
 const { execFile } = require('child_process');
 
 const DWMWA_USE_IMMERSIVE_DARK_MODE = 20;        // Win10 2004+（build 19041+）
 const DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY = 19; // Win10 1909 及更早
+
+// koffi 原生 FFI：加载失败（原生二进制不兼容等）时置 null，回退 PowerShell
+let dwmSetWindowAttribute = null;
+let hwndToPtr = (n) => n; // koffi 不可用时恒等（此时 setAttr 也为 null，不会被调用）
+try {
+  const koffi = require('koffi');
+  dwmSetWindowAttribute = koffi.load('dwmapi.dll').func('int DwmSetWindowAttribute(void* hwnd, int attr, int* val, int cb)');
+  // getNativeWindowHandle() 返回的是「存有 HWND 值的 Buffer」，koffi 的 void* 参数
+  // 需要的是指针值本身——读 BigInt 再 koffi.as 转指针，否则传的是 Buffer 地址（E_HANDLE）
+  hwndToPtr = (n) => koffi.as(n, 'void*');
+} catch { /* 回退 PowerShell */ }
 
 function hwndToLong(win) {
   const buf = win.getNativeWindowHandle();
@@ -75,11 +84,28 @@ function tryShells(exec, shells, ps, log) {
   next();
 }
 
-function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform, log = () => {}, shells = ['powershell', 'pwsh'] } = {}) {
+// koffi 直调：先试 20，失败退 19；返回是否成功
+function applyViaKoffi(win, dark, log, setAttr, toPtr = (n) => n) {
+  const hwnd = win.getNativeWindowHandle();
+  const hwndPtr = toPtr(hwnd.readBigInt64LE(0));
+  const r20 = setAttr(hwndPtr, DWMWA_USE_IMMERSIVE_DARK_MODE, [dark], 4);
+  if (r20 === 0) { log('[dwm] ok attr=20 via koffi'); return true; }
+  const r19 = setAttr(hwndPtr, DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY, [dark], 4);
+  if (r19 === 0) { log('[dwm] ok attr=19 via koffi'); return true; }
+  log(`[dwm] fail r20=${r20} r19=${r19} via koffi`);
+  return false;
+}
+
+function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform, log = () => {}, shells = ['powershell', 'pwsh'], setAttr = dwmSetWindowAttribute, toPtr = hwndToPtr } = {}) {
   if (platform !== 'win32') return false;
   if (!win || typeof win.isDestroyed !== 'function' || win.isDestroyed()) return false;
   if (typeof win.getNativeWindowHandle !== 'function') return false;
   const dark = theme === 'dark' ? 1 : 0;
+  if (setAttr) {
+    try { return applyViaKoffi(win, dark, log, setAttr, toPtr); }
+    catch (e) { log(`[dwm] koffi error=${String(e).slice(0, 120)}`); }
+  }
+  // 回退 PowerShell（koffi 不可用或调用抛异常时）
   let hwndLong;
   try { hwndLong = hwndToLong(win); } catch { return false; }
   const ps = buildScript(hwndLong, dark);
@@ -89,6 +115,7 @@ function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.p
 
 module.exports = {
   applyWindowDarkMode,
+  applyViaKoffi,
   buildScript,
   hwndToLong,
   parseStatus,
