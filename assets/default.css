@@ -57,13 +57,20 @@ h1 *,
 /* ========== 代码块 Consolas 字体 ========== */
 /* 代码正文在 div[contenteditable="true"] 内，被正文 .notion-page-block div[contenteditable]
    "true" * (0,2,1) 压过——需镜像同结构 .notion-code-block div[contenteditable="true"] *
-   (0,2,1)，本文件内代码规则在正文之后，同特异性后注入者赢 */
+   (0,2,1)，本文件内代码规则在正文之后，同特异性后注入者赢。
+   行内代码 <code> 同样在 div[contenteditable="true"] 内，用 .notion-page-content
+   div[contenteditable="true"] code (0,2,2) 压过正文 (0,2,1)；.notion-page-content
+   code (0,1,1) 兜底非 contenteditable 路径（压过 .notion-page-content * 0,1,0） */
 .notion-code-block,
 .notion-code-block pre,
 .notion-code-block code,
 .notion-code-block *,
 .notion-code-block div[contenteditable="true"],
-.notion-code-block div[contenteditable="true"] * {
+.notion-code-block div[contenteditable="true"] *,
+.notion-page-content code,
+.notion-page-content div[contenteditable="true"] code,
+[role="dialog"] code,
+[role="dialog"] div[contenteditable="true"] code {
   font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
 }
 

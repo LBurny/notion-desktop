@@ -174,8 +174,11 @@ const UI_SELECTORS = [
 // 代码块：容器/工具栏（语言标签等）低特异性即可；代码正文在 div[contenteditable="true"]
 // 内，被正文 .notion-page-block div[contenteditable="true"] * (0,2,1) 压过——需镜像同结构
 // 选择器 .notion-code-block div[contenteditable="true"] * (0,2,1)，同特异性后注入者赢。
+// 行内代码：<code> 直接在文本块的 div[contenteditable="true"] 内，同样被正文 (0,2,1)
+// 压过；.notion-page-content div[contenteditable="true"] code (0,2,2) 压过正文，
+// .notion-page-content code (0,1,1) 兜底非 contenteditable 路径（压过 .notion-page-content *）。
 // 浮层预览同理补 contenteditable 专项。
-const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *';
+const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *, .notion-page-content code, .notion-page-content div[contenteditable="true"] code, [role="dialog"] code, [role="dialog"] div[contenteditable="true"] code';
 // 行内公式：.notion-text-block 专项 (0,4,0) 复用 default.css 同特异性 :not 选择器，
 // 压过 custom.css 旧副本的同特异性规则（同特异性后注入者赢）；通用 .katex:not(...)
 // (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式——这些块无 custom.css 公式

@@ -288,6 +288,16 @@ test('buildSettingsCss 代码正文 contenteditable 专项选择器：压过正�
   assert.ok(css.includes('[role="dialog"] .notion-code-block div[contenteditable="true"] *'), '浮层预览代码正文同样覆盖');
 });
 
+test('buildSettingsCss 行内代码 <code> 选择器：覆盖文本块里的行内代码（np.float32 等）', () => {
+  // 行内代码 <code> 直接在文本块 div[contenteditable="true"] 内，被正文 (0,2,1) 压过；
+  // .notion-page-content div[contenteditable="true"] code (0,2,2) 压过正文，
+  // .notion-page-content code (0,1,1) 兜底非 contenteditable 路径。
+  const css = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
+  assert.ok(css.includes('.notion-page-content div[contenteditable="true"] code'), '行内代码 contenteditable 专项 (0,2,2) 压过正文');
+  assert.ok(css.includes('.notion-page-content code'), '行内代码非 contenteditable 兜底');
+  assert.ok(css.includes('[role="dialog"] code'), '浮层预览行内代码同样覆盖');
+});
+
 test('buildSettingsCss 公式槽：默认不下发，自定义时内联+展示+浮层全覆盖并垫 KaTeX_Main', () => {
   const custom = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: '', ui: '', code: '', math: 'Cambria Math' } });
   assert.ok(custom.includes('"Cambria Math", "KaTeX_Main", "Times New Roman", serif'));
