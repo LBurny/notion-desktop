@@ -58,7 +58,22 @@ function parseStatus(stdout) {
   return line || null;
 }
 
-function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform, log = () => {} } = {}) {
+function tryShells(exec, shells, ps, log) {
+  const args = ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps];
+  let i = 0;
+  const next = () => {
+    if (i >= shells.length) { log(`[dwm] all shells failed (${shells.join(', ')})`); return; }
+    const shell = shells[i++];
+    exec(shell, args, { windowsHide: true }, (err, stdout) => {
+      const status = parseStatus(stdout);
+      if (status) { log(`[dwm] ${status} via ${shell}`); return; } // 已生效，不再试后续 shell
+      next(); // 无状态行（含 err/闪退）→ 回退下一个 shell
+    });
+  };
+  next();
+}
+
+function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.platform, log = () => {}, shells = ['powershell', 'pwsh'] } = {}) {
   if (platform !== 'win32') return false;
   if (!win || typeof win.isDestroyed !== 'function' || win.isDestroyed()) return false;
   if (typeof win.getNativeWindowHandle !== 'function') return false;
@@ -66,15 +81,7 @@ function applyWindowDarkMode(win, theme, { exec = execFile, platform = process.p
   let hwndLong;
   try { hwndLong = hwndToLong(win); } catch { return false; }
   const ps = buildScript(hwndLong, dark);
-  exec('powershell',
-    ['-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps],
-    { windowsHide: true },
-    (err, stdout) => {
-      const status = parseStatus(stdout);
-      if (status) log(`[dwm] ${status}`);
-      else if (err) log(`[dwm] error ${String(err).slice(0, 120)}`);
-    }
-  );
+  tryShells(exec, shells, ps, log);
   return true;
 }
 
@@ -83,6 +90,7 @@ module.exports = {
   buildScript,
   hwndToLong,
   parseStatus,
+  tryShells,
   DWMWA_USE_IMMERSIVE_DARK_MODE,
   DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY,
 };

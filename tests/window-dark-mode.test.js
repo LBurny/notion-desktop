@@ -5,6 +5,7 @@ const {
   buildScript,
   hwndToLong,
   parseStatus,
+  tryShells,
   DWMWA_USE_IMMERSIVE_DARK_MODE,
   DWMWA_USE_IMMERSIVE_DARK_MODE_LEGACY,
 } = require('../src/main/window-dark-mode');
@@ -46,9 +47,10 @@ test('buildScript light=0 嵌入 $v = 0', () => {
 
 test('applyWindowDarkMode dark 调用 exec 并传正确脚本', () => {
   let called = null;
+  // 返回成功状态行，使 tryShells 在第一个 shell 即收手（不回退 pwsh）
   const fakeExec = (cmd, args, opts, cb) => {
     called = { cmd, args, opts };
-    cb && cb();
+    cb && cb(null, 'nd-dwm ok attr=20\r\n', '');
   };
   const ok = applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec });
   assert.strictEqual(ok, true);
@@ -139,11 +141,11 @@ test('parseStatus 解析 nd-dwm 行，忽略其余输出', () => {
 
 // ---- exec 回调回报 ----
 
-test('applyWindowDarkMode 成功时通过 log 回报状态', () => {
+test('applyWindowDarkMode 成功时通过 log 回报状态（含来源 shell）', () => {
   let logged = null;
   const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, 'nd-dwm ok attr=20\r\n', ''); };
   applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, log: (m) => { logged = m; } });
-  assert.strictEqual(logged, '[dwm] nd-dwm ok attr=20');
+  assert.strictEqual(logged, '[dwm] nd-dwm ok attr=20 via powershell');
 });
 
 test('applyWindowDarkMode 两属性失败时 log 带 r20/r19（及可能的 cp）', () => {
@@ -153,11 +155,31 @@ test('applyWindowDarkMode 两属性失败时 log 带 r20/r19（及可能的 cp�
   assert.ok(logged.includes('r20=1') && logged.includes('r19=1') && logged.includes('cp=1'), logged);
 });
 
-test('applyWindowDarkMode 无状态行且无 err 时不调 log', () => {
+test('applyWindowDarkMode powershell 无状态行时自动回退 pwsh', () => {
+  const calls = [];
+  const fakeExec = (cmd, args, opts, cb) => {
+    calls.push(cmd);
+    cb && cb(null, '', ''); // powershell 无状态行（模拟 5.1 失败）→ 应尝试 pwsh
+  };
+  applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec });
+  assert.deepEqual(calls, ['powershell', 'pwsh']);
+});
+
+test('applyWindowDarkMode powershell 成功时不回退 pwsh', () => {
+  const calls = [];
+  const fakeExec = (cmd, args, opts, cb) => {
+    calls.push(cmd);
+    cb && cb(null, 'nd-dwm ok attr=20\r\n', '');
+  };
+  applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec });
+  assert.deepEqual(calls, ['powershell']);
+});
+
+test('tryShells 全部失败时 log 汇总行', () => {
   let logged = null;
-  const fakeExec = (cmd, args, opts, cb) => { cb && cb(null, '', ''); };
+  const fakeExec = (cmd, args, opts, cb) => { cb && cb(new Error('boom'), '', ''); };
   applyWindowDarkMode(fakeWin(), 'dark', { exec: fakeExec, log: (m) => { logged = m; } });
-  assert.strictEqual(logged, null);
+  assert.strictEqual(logged, '[dwm] all shells failed (powershell, pwsh)');
 });
 
 test('applyWindowDarkMode 默认 log 为空函数也不抛', () => {
