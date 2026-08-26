@@ -117,7 +117,9 @@ $('slash-add').addEventListener('click', () => {
   if (settings.slashCommands.length >= 10) return;
   settings.slashCommands.push({ combo: 'Ctrl+Shift+X', command: '' });
   renderSlash();
-  push();
+  // 不 push()/commit()：主进程 sanitizeSettings 会丢弃空命令项，commit 后回播的
+  // language-changed 会让 onLanguage 用干净快照覆盖本地，草稿行凭空消失。
+  // 草稿只在本地渲染，等用户填入命令后由 input 事件触发 push() 才提交
 });
 
 $('close-tray').addEventListener('change', () => {
@@ -151,9 +153,13 @@ window.settingsApi.onTheme((theme) => {
 });
 
 // 语言广播：另一个窗口改了语言后本窗即时跟随；同时刷新本地设置快照，
-// 避免之后本窗提交把对方改过的字段（含 language 本身）写回旧值
+// 避免之后本窗提交把对方改过的字段（含 language 本身）写回旧值。
+// 草稿行（命令为空的未提交新增项）需跨刷新保留：主进程 sanitize 会丢弃空命令项，
+// 直接用主进程快照覆盖会让正在编辑的新增行凭空消失
 window.settingsApi.onLanguage((l) => {
+  const drafts = window.slashDrafts.extractDrafts(settings.slashCommands);
   settings = window.settingsApi.get();
+  settings.slashCommands = window.slashDrafts.mergeDrafts(settings.slashCommands, drafts);
   lang = l;
   applyLang();
   render();

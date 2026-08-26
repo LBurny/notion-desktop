@@ -15,7 +15,20 @@
       <button id="close" data-i18n-title="common.close" title="关闭">&#10005;</button>
     </div>
     <div id="form">
-      <div class="section first" data-i18n="settings.hotkeys">快捷键</div>
+      <div class="section first" data-i18n="settings.launch">启动</div>
+      <label class="row check">
+        <input id="launch-at-login" type="checkbox" />
+        <span data-i18n="settings.launchAtLogin">开机时自动启动（静默到托盘）</span>
+      </label>
+      <div class="section" data-i18n="settings.language">语言</div>
+      <div class="row">
+        <div class="segmented" id="lang-group">
+          <label><input type="radio" name="language" value="auto" /><span data-i18n="settings.langAuto">跟随系统</span></label>
+          <label><input type="radio" name="language" value="zh-CN" /><span>中文</span></label>
+          <label><input type="radio" name="language" value="en" /><span>English</span></label>
+        </div>
+      </div>
+      <div class="section" data-i18n="settings.hotkeys">快捷键</div>
       <label class="row">
         <span class="name" data-i18n="settings.zoomIn">放大页面</span>
         <input id="hk-zoomIn" class="hotkey" type="text" readonly data-i18n-title="settings.hotkeyTitle" title="点击后按下新快捷键，Esc 取消" />
@@ -40,24 +53,12 @@
         <input id="close-quit" type="radio" name="closeAction" value="quit" />
         <span data-i18n="settings.closeQuit">退出程序</span>
       </label>
-      <div class="section" data-i18n="settings.launch">启动</div>
-      <label class="row check">
-        <input id="launch-at-login" type="checkbox" />
-        <span data-i18n="settings.launchAtLogin">开机时自动启动（静默到托盘）</span>
-      </label>
-      <div class="section" data-i18n="settings.language">语言</div>
-      <div class="row">
-        <div class="segmented" id="lang-group">
-          <label><input type="radio" name="language" value="auto" /><span data-i18n="settings.langAuto">跟随系统</span></label>
-          <label><input type="radio" name="language" value="zh-CN" /><span>中文</span></label>
-          <label><input type="radio" name="language" value="en" /><span>English</span></label>
-        </div>
-      </div>
       <p id="hint"></p>
     </div>
   </div>
   <script src="../shared/i18n.js"></script>
   <script src="hotkey-capture.js"></script>
+  <script src="slash-drafts.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

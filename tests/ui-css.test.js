@@ -94,7 +94,9 @@ test('.section 分区样式归共享表；样式页与设置页同风格分段',
   assert.ok(/class="section first"[^>]*>字体</.test(STYLE_SETTINGS_HTML), '样式页缺「字体」首区');
   assert.ok(/class="section"[^>]*>版式</.test(STYLE_SETTINGS_HTML), '样式页缺「版式」分区');
   assert.ok(/class="section"[^>]*>其他</.test(STYLE_SETTINGS_HTML), '样式页缺「其他」分区');
-  assert.ok(/class="section first"[^>]*>快捷键</.test(APP_SETTINGS_HTML), '设置页缺「快捷键」首区');
+  assert.ok(/class="section first"[^>]*>启动</.test(APP_SETTINGS_HTML), '设置页缺「启动」首区');
+  assert.ok(/class="section"[^>]*>语言</.test(APP_SETTINGS_HTML), '设置页缺「语言」分区');
+  assert.ok(/class="section"[^>]*>快捷键</.test(APP_SETTINGS_HTML), '设置页缺「快捷键」分区');
 });
 
 // ── 标题栏排版一致性：按钮族同宽、顶栏动作与窗口控制之间有主题色分隔线 ──

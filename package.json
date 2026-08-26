@@ -31,7 +31,9 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "shortcutName": "Notion Desktop"
+      "shortcutName": "Notion Desktop",
+      "include": "build/installer.nsh",
+      "createDesktopShortcut": false
     }
   },
   "devDependencies": {

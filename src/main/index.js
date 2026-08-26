@@ -19,6 +19,7 @@ const { createSettingsWindows } = require('./settings-windows');
 const { attachRequestFilter } = require('./request-filter');
 const { resolveTrayAction } = require('./tray-actions');
 const { syncLoginItem, shouldStartHidden } = require('./login-item');
+const { secondInstanceAction } = require('./single-instance');
 const { resolveLanguage } = require('../renderer/shared/i18n');
 
 const NOTION_URL = 'https://www.notion.so/';
@@ -204,6 +205,25 @@ function createWindow({ startHidden = false } = {}) {
     }
     e.preventDefault();
     win.hide();
+  });
+}
+
+// 单实例锁：已运行时第二实例（双击桌面快捷方式）直接唤起第一实例主窗并退出，
+// 不启动新进程造成卡顿。lock 必须在 app.whenReady 之前请求
+const gotLock = app.requestSingleInstanceLock();
+if (!gotLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (!win) return;
+    const action = secondInstanceAction({
+      destroyed: win.isDestroyed(),
+      minimized: win.isMinimized(),
+      visible: win.isVisible(),
+    });
+    if (action.restore) win.restore();
+    if (action.show) win.show();
+    if (action.focus) win.focus();
   });
 }
 
