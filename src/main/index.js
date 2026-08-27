@@ -149,8 +149,8 @@ function adjustZoom(delta) {
   applyZoomEverywhere();
 }
 
-// 全局快捷键归 hotkey-service（toggleWindow 须在窗口隐藏时也能唤回，故用 globalShortcut）；
-// 标签切换键仅聚焦期注册由服务内部处理
+// 全局快捷键归 hotkey-service（toggleWindow 须在窗口隐藏时也能唤回，故用 globalShortcut；
+// 缩放/标签切换键仅聚焦期注册，失焦即注销，不误触不占键）；
 let hotkeys = null;
 
 function layoutViews() {
@@ -337,9 +337,9 @@ app.whenReady().then(() => {
     firstView.webContents.once('did-finish-load', () => perf.mark('first-view-loaded'));
   }
 
-  win.on('focus', () => hotkeys.registerTabSwitch());
-  win.on('blur', () => hotkeys.unregisterTabSwitch());
-  hotkeys.registerTabSwitch();
+  win.on('focus', () => hotkeys.registerFocusedKeys());
+  win.on('blur', () => hotkeys.unregisterFocusedKeys());
+  hotkeys.registerFocusedKeys();
 
   watchCustomCss(customCssPath, () => { cssProvider.invalidate(); applyViewSettings(); });
   console.log('自定义样式文件:', customCssPath);
