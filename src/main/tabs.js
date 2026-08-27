@@ -1,18 +1,12 @@
 // 标签页粘合层：视图生命周期、导航跟踪、IPC 状态推送、持久化
 // 纯状态逻辑在 tab-manager.js，这里只做 Electron 侧的事
 const { WebContentsView, shell, ipcMain } = require('electron');
-const { loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground } = require('./tab-manager');
+const { loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground, classifyWindowOpen } = require('./tab-manager');
 const { shortcutFor } = require('./tab-shortcuts');
 const { createQuickFindFlow } = require('./quick-find-flow');
 const { findSlashCommand, runSlashCommand } = require('./slash-commands');
 const { createTopbarRelay } = require('./topbar-relay');
 const { createStandbyView } = require('./standby-view');
-
-const AUTH_POPUPS = [
-  'https://accounts.google.com', 'https://appleid.apple.com',
-  'https://login.microsoftonline.com', 'https://login.live.com',
-  'https://auth.openai.com', 'https://auth0.openai.com',
-];
 
 function createTabs(deps) {
   const {
@@ -226,13 +220,21 @@ function createTabs(deps) {
       }
     });
     wc.setWindowOpenHandler(({ url }) => {
-      if (AUTH_POPUPS.some((p) => url.startsWith(p))) return { action: 'allow' };
-      if (url.startsWith('https://www.notion.so') || url.startsWith('https://notion.so')) {
-        newTab(url);
-        return { action: 'deny' };
+      switch (classifyWindowOpen(url)) {
+        case 'auth-popup':
+          return { action: 'allow' };
+        case 'download':
+          // 附件/文件直链：原地触发下载（302 链路会带 Content-Disposition: attachment），
+          // 不开标签也不交外部浏览器（v0.2.10 修附件点击误开随机标签）
+          wc.session.downloadURL(url);
+          return { action: 'deny' };
+        case 'notion-page':
+          newTab(url);
+          return { action: 'deny' };
+        default:
+          shell.openExternal(url);
+          return { action: 'deny' };
       }
-      shell.openExternal(url);
-      return { action: 'deny' };
     });
     wc.on('did-fail-load', (_e, _code, _desc, validatedURL, isMainFrame) => {
       if (isMainFrame && validatedURL.startsWith('http')) {

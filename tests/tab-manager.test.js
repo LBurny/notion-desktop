@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground } = require('../src/main/tab-manager');
+const { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground, classifyWindowOpen } = require('../src/main/tab-manager');
 
 const URL = 'https://www.notion.so/';
 
@@ -130,4 +130,27 @@ test('themeBackground 深色给 Notion 深色底、其余给白底', () => {
   assert.strictEqual(themeBackground('light'), '#ffffff');
   assert.strictEqual(themeBackground('xxx'), '#ffffff');
   assert.strictEqual(themeBackground(undefined), '#ffffff');
+});
+
+// ── window-open 分流（修 v0.2.10 附件点击误开新标签）──
+// 实测：Notion 附件点击 window.open('https://www.notion.so/signed/attachment:<uuid>:<文件名>?table=block&id=…')，
+// 该 URL 302 到 file.notion.so 且 Content-Disposition: attachment——是下载不是页面，不得开标签
+test('classifyWindowOpen：Notion 文件/附件 URL 分流为 download', () => {
+  assert.strictEqual(classifyWindowOpen('https://www.notion.so/signed/attachment%3Auuid%3A%E8%AE%BA%E6%96%87.doc?table=block&id=x'), 'download');
+  assert.strictEqual(classifyWindowOpen('https://file.notion.so/f/f/adf40d80/47ec27d5/file.doc?X-Amz-Signature=x'), 'download');
+  assert.strictEqual(classifyWindowOpen('https://prod-files-secure.s3.us-west-2.amazonaws.com/uuid/file.pdf?X-Amz-Algorithm=x'), 'download');
+});
+
+test('classifyWindowOpen：登录弹窗放行、Notion 页面开标签、其余外开', () => {
+  assert.strictEqual(classifyWindowOpen('https://accounts.google.com/o/oauth2/auth?client_id=1'), 'auth-popup');
+  assert.strictEqual(classifyWindowOpen('https://login.microsoftonline.com/common/oauth2'), 'auth-popup');
+  assert.strictEqual(classifyWindowOpen('https://www.notion.so/Page1'), 'notion-page');
+  assert.strictEqual(classifyWindowOpen('https://notion.so/Page2'), 'notion-page');
+  assert.strictEqual(classifyWindowOpen('https://github.com/readdig/readdig'), 'external');
+});
+
+test('classifyWindowOpen：/signed/ 不得被 notion.so 页面规则抢走（顺序敏感）', () => {
+  // /signed/ 是 www.notion.so 子路径，分类必须在页面规则之前命中 download
+  const u = 'https://www.notion.so/signed/attachment%3Auuid%3Aa.doc?table=block';
+  assert.notStrictEqual(classifyWindowOpen(u), 'notion-page');
 });

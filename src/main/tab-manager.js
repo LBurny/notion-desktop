@@ -120,4 +120,30 @@ function themeBackground(theme) {
   return theme === 'dark' ? '#191919' : '#ffffff';
 }
 
-module.exports = { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground };
+// ── window-open 分流（纯函数，tests/tab-manager.test.js 看护）──
+// auth-popup  登录弹窗照常放行（OAuth 需要真窗口）
+// download    Notion 文件/附件直链：响应带 Content-Disposition: attachment，是下载不是页面。
+//             误走页面规则会凭空开一个内容随机的标签（v0.2.10 附件点击误开标签根因，
+//             实测 window.open('https://www.notion.so/signed/attachment:<uuid>:<文件名>?table=block&id=…')）
+// notion-page 站内页面链接 → 开应用内标签
+// external    其余交给系统浏览器
+const AUTH_POPUP_PREFIXES = [
+  'https://accounts.google.com', 'https://appleid.apple.com',
+  'https://login.microsoftonline.com', 'https://login.live.com',
+  'https://auth.openai.com', 'https://auth0.openai.com',
+];
+const NOTION_FILE_URL_PREFIXES = [
+  'https://www.notion.so/signed/', // 附件签名跳转地址（302 → file.notion.so）
+  'https://file.notion.so/',       // 文件服务直链
+  'https://prod-files-secure.s3.us-west-2.amazonaws.com/', // 旧版 S3 直链
+];
+
+function classifyWindowOpen(url) {
+  if (AUTH_POPUP_PREFIXES.some((p) => url.startsWith(p))) return 'auth-popup';
+  // /signed/ 是 www.notion.so 子路径，必须先于页面规则判断
+  if (NOTION_FILE_URL_PREFIXES.some((p) => url.startsWith(p))) return 'download';
+  if (url.startsWith('https://www.notion.so') || url.startsWith('https://notion.so')) return 'notion-page';
+  return 'external';
+}
+
+module.exports = { createTabManager, loadTabsFile, saveTabsFile, DEFAULT_MAX_TABS, themeBackground, classifyWindowOpen };

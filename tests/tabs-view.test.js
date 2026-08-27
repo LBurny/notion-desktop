@@ -7,6 +7,7 @@ const Module = require('module');
 
 function setup({ theme = 'dark' } = {}) {
   const created = [];
+  const opened = []; // shell.openExternal 录制
   // ipcMain 桩：支持 queryWc 的 send→reply 往返（location-href-query → location-href）
   const ipcListeners = {};
   const emitReply = (channel, sender, data) => {
@@ -23,6 +24,7 @@ function setup({ theme = 'dark' } = {}) {
       this.cssKeys = 0;
       this._loads = 0;
       this._spaNavUrl = null;
+      this.session = { _downloads: [], downloadURL(u) { this._downloads.push(u); } };
     }
     loadURL(u) { this._url = u; this._loads++; }
     loadFile() {}
@@ -36,7 +38,7 @@ function setup({ theme = 'dark' } = {}) {
     insertCSS() { return Promise.resolve('k' + ++this.cssKeys); }
     removeInsertedCSS() { return Promise.resolve(); }
     setZoomFactor() {}
-    setWindowOpenHandler() {}
+    setWindowOpenHandler(fn) { this._openHandler = fn; }
     setBackgroundColor() {}
     isDestroyed() { return false; }
     getURL() { return this._url; }
@@ -55,7 +57,11 @@ function setup({ theme = 'dark' } = {}) {
     setBackgroundColor(c) { this.bgColors.push(c); }
     setBounds() {}
   }
-  const electronStub = { WebContentsView, shell: { openExternal() {} }, ipcMain: ipcMainStub };
+  const electronStub = {
+    WebContentsView,
+    shell: { openExternal(u) { opened.push(u); } },
+    ipcMain: ipcMainStub,
+  };
   const orig = Module.prototype.require;
   Module.prototype.require = function (id) {
     if (id === 'electron') return electronStub;
@@ -81,7 +87,7 @@ function setup({ theme = 'dark' } = {}) {
       onChanged() {}, onEmpty() {}, onTopbarState() {}, onUiFont() {},
       saveFile() {},
     });
-    return { tabs, created };
+    return { tabs, created, opened };
   } finally {
     Module.prototype.require = orig;
   }
@@ -205,4 +211,46 @@ test('ensureView：活动视图已销毁则重建（不抛 destroyed child view�
   assert.doesNotThrow(() => tabs.activateTab(id1), '激活已销毁视图的标签不应抛');
   assert.equal(created.length, 1, '已销毁视图应重建（认领预热或冷加载）');
   assert.equal(tabs.activeView().webContents.isDestroyed(), false, '新视图未销毁');
+});
+
+// ── window-open 分流（修 v0.2.10 附件点击误开新标签）──
+// 实测：附件点击 window.open('https://www.notion.so/signed/attachment:…')，原逻辑误开新标签
+test('window-open：附件签名地址走 session.downloadURL 原地下载，不开标签不外开', () => {
+  const { tabs, created, opened } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const wc = created[0].webContents;
+  const url = 'https://www.notion.so/signed/attachment%3Auuid%3A%E8%AE%BA%E6%96%87.doc?table=block&id=x';
+  assert.deepEqual(wc._openHandler({ url }), { action: 'deny' });
+  assert.deepEqual(wc.session._downloads, [url], '必须原地触发下载');
+  assert.equal(created.length, 1, '不得新开标签');
+  assert.equal(opened.length, 0, '不得交给外部浏览器');
+});
+
+test('window-open：file.notion.so / S3 直链同样分流下载', () => {
+  const { tabs, created } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const wc = created[0].webContents;
+  wc._openHandler({ url: 'https://file.notion.so/f/f/uuid/file.doc' });
+  wc._openHandler({ url: 'https://prod-files-secure.s3.us-west-2.amazonaws.com/uuid/f.pdf?X-Amz-Signature=x' });
+  assert.equal(wc.session._downloads.length, 2, '两条文件直链都应触发下载');
+  assert.equal(created.length, 1, '不开新标签');
+});
+
+test('window-open：Notion 页面仍开新标签，外链仍 shell.openExternal', () => {
+  const { tabs, created, opened } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const wc = created[0].webContents;
+  assert.deepEqual(wc._openHandler({ url: 'https://www.notion.so/Page2' }), { action: 'deny' });
+  assert.equal(tabs.payload().tabs.length, 2, 'Notion 页面照常开标签');
+  wc._openHandler({ url: 'https://github.com/readdig/readdig' });
+  assert.deepEqual(opened, ['https://github.com/readdig/readdig'], '外链交系统浏览器');
+  assert.equal(wc.session._downloads.length, 0, '外链不得误触发下载');
+});
+
+test('window-open：登录弹窗仍放行 allow', () => {
+  const { tabs, created } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const wc = created[0].webContents;
+  const url = 'https://accounts.google.com/o/oauth2/auth?client_id=1';
+  assert.deepEqual(wc._openHandler({ url }), { action: 'allow' });
 });
