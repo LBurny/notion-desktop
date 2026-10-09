@@ -6,6 +6,14 @@ const { saveTheme } = require('./theme-store');
 
 const GRACE_MS = 15000;
 
+// 主题探针只在 Notion 应用页有效：calendar.notion.so 等姊妹站不打 dark class，
+// 探针恒报 light——15s 宽限期后被接受会把全局主题与 theme.json 洗成 light（实测坑）。
+// 主进程据此丢弃非应用页的主题上报（preload 侧同样按此闸口停发）
+const THEME_PROBE_RE = /^https:\/\/((www\.)?notion\.so|app\.notion\.com)\//;
+function isThemeProbeUrl(url) {
+  return typeof url === 'string' && THEME_PROBE_RE.test(url);
+}
+
 function shouldAcceptReport(reported, current, elapsedMs, graceMs = GRACE_MS) {
   if (reported !== 'dark' && reported !== 'light') return false;
   if (reported === 'light' && current === 'dark' && elapsedMs < graceMs) return false;
@@ -34,4 +42,4 @@ function createThemeService({ themeFile, initial, onApplied, now = () => Date.no
   };
 }
 
-module.exports = { createThemeService, shouldAcceptReport, GRACE_MS };
+module.exports = { createThemeService, shouldAcceptReport, isThemeProbeUrl, GRACE_MS };

@@ -157,6 +157,10 @@ const BODY_SELECTORS = [
   '.notion-page-view-header', '.notion-page-view-header *',
   '.notion-page-header', '.notion-page-header *',
   '.notion-page-block div[contenteditable="true"]', '.notion-page-block div[contenteditable="true"] *',
+  // 数据库/集合视图条目（列表行/看板卡片/表格行）：整页数据库渲染在
+  // .notion-page-content 之外（实测其祖先为 main.notion-frame），看板卡片标题没有
+  // contenteditable 祖先——原有正文选择器全部落空，实测落到 ui-sans-serif
+  '.notion-collection-item', '.notion-collection-item *',
 ].join(', ');
 const UI_SELECTORS = [
   '.notion-sidebar', '.notion-sidebar *',
@@ -172,6 +176,17 @@ const UI_SELECTORS = [
   '.notion-dialog', '.notion-dialog *',
   '.notion-quick-find', '.notion-quick-find *',
   '.notion-search', '.notion-search *',
+  // 数据库/集合视图 chrome（视图标签/New 按钮/过滤排序，实测落到 ui-sans-serif）；
+  // 视图体内非条目元素（看板分组头/表头/空态）用 :not 排除条目子树——
+  // 条目内容归正文（.notion-collection-item *），防止界面规则抢走
+  '.notion-collection-view-tab', '.notion-collection-view-tab *',
+  '.notion-collection-view-tab-button', '.notion-collection-view-tab-button *',
+  '.notion-collection-view-item-add', '.notion-collection-view-item-add *',
+  '.notion-collection-filter', '.notion-collection-filter *',
+  '.notion-collection-sort', '.notion-collection-sort *',
+  '.notion-collection-edit-view', '.notion-collection-edit-view *',
+  '.notion-collection-automation-edit-view', '.notion-collection-automation-edit-view *',
+  '.notion-collection-view-body :not(.notion-collection-item):not(.notion-collection-item *)',
 ].join(', ');
 // 代码块：容器/工具栏（语言标签等）低特异性即可；代码正文在 div[contenteditable="true"]
 // 内，被正文 .notion-page-block div[contenteditable="true"] * (0,2,1) 压过——需镜像同结构
@@ -182,7 +197,9 @@ const UI_SELECTORS = [
 // .notion-page-content .notion-inline-code-container * (0,2,0) !important 压过正文 0,1,0 与
 // 等于 :first-of-type 0,2,0（后注入者赢）；.notion-page-content div[contenteditable] …
 // (0,3,1) 兜底 .notion-page-block 在场时正文 0,2,1。浮层预览同理。
-const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *, .notion-page-content .notion-inline-code-container, .notion-page-content .notion-inline-code-container *, .notion-page-content div[contenteditable="true"] .notion-inline-code-container, .notion-page-content div[contenteditable="true"] .notion-inline-code-container *, [role="dialog"] .notion-inline-code-container, [role="dialog"] .notion-inline-code-container *';
+// 集合视图专项：.notion-collection-item * (0,1,0) 正文规则与代码基础选择器同特异性，
+// 集合内的代码块/行内代码需 (0,2,0) 才能稳赢（default.css 镜像同款）
+const CODE_SELECTORS = '.notion-code-block, .notion-code-block *, .notion-code-block div[contenteditable="true"], .notion-code-block div[contenteditable="true"] *, [role="dialog"] .notion-code-block, [role="dialog"] .notion-code-block *, [role="dialog"] .notion-code-block div[contenteditable="true"] *, .notion-page-content .notion-inline-code-container, .notion-page-content .notion-inline-code-container *, .notion-page-content div[contenteditable="true"] .notion-inline-code-container, .notion-page-content div[contenteditable="true"] .notion-inline-code-container *, [role="dialog"] .notion-inline-code-container, [role="dialog"] .notion-inline-code-container *, .notion-collection-item .notion-code-block, .notion-collection-item .notion-code-block *, .notion-collection-item .notion-inline-code-container, .notion-collection-item .notion-inline-code-container *';
 // 行内公式：.notion-text-block 专项 (0,4,0) 复用 default.css 同特异性 :not 选择器，
 // 压过 custom.css 旧副本的同特异性规则（同特异性后注入者赢）；通用 .katex:not(...)
 // (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式——这些块无 custom.css 公式

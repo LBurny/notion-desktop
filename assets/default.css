@@ -45,12 +45,33 @@ h1 *,
 .notion-page-header *,
 .notion-page-block div[contenteditable="true"],
 .notion-page-block div[contenteditable="true"] *,
+/* 数据库/集合视图条目（列表行/看板卡片/表格行）：整页数据库渲染在
+   .notion-page-content 之外，卡片标题无 contenteditable 祖先，原有规则落空 */
+.notion-collection-item,
+.notion-collection-item *,
 .notion-sidebar,
 .notion-sidebar *,
 .notion-topbar,
 .notion-topbar *,
 .notion-breadcrumb,
-.notion-breadcrumb * {
+.notion-breadcrumb *,
+/* 集合视图 chrome：视图标签/New 按钮/过滤排序；视图体内非条目元素
+  （分组头/表头/空态）用 :not 排除条目子树，条目内容归正文 */
+.notion-collection-view-tab,
+.notion-collection-view-tab *,
+.notion-collection-view-tab-button,
+.notion-collection-view-tab-button *,
+.notion-collection-view-item-add,
+.notion-collection-view-item-add *,
+.notion-collection-filter,
+.notion-collection-filter *,
+.notion-collection-sort,
+.notion-collection-sort *,
+.notion-collection-edit-view,
+.notion-collection-edit-view *,
+.notion-collection-automation-edit-view,
+.notion-collection-automation-edit-view *,
+.notion-collection-view-body :not(.notion-collection-item):not(.notion-collection-item *) {
   font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif !important;
 }
 
@@ -73,7 +94,13 @@ h1 *,
 .notion-page-content div[contenteditable="true"] .notion-inline-code-container,
 .notion-page-content div[contenteditable="true"] .notion-inline-code-container *,
 [role="dialog"] .notion-inline-code-container,
-[role="dialog"] .notion-inline-code-container * {
+[role="dialog"] .notion-inline-code-container *,
+/* 集合视图专项：.notion-collection-item * (0,1,0) 与代码基础选择器同特异性，
+   集合内代码需 (0,2,0) 稳赢 */
+.notion-collection-item .notion-code-block,
+.notion-collection-item .notion-code-block *,
+.notion-collection-item .notion-inline-code-container,
+.notion-collection-item .notion-inline-code-container * {
   font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
 }
 

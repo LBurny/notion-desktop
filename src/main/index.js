@@ -18,7 +18,7 @@ const { debounce } = require('./debounce');
 const { calcMenuPosition } = require('./menu-position');
 const { loadSettings, saveSettings, sanitizeSettings, clampZoom, buildSettingsCss, titlebarHeightForZoom } = require('./style-settings');
 const { loadTheme } = require('./theme-store');
-const { createThemeService } = require('./theme-service');
+const { createThemeService, isThemeProbeUrl } = require('./theme-service');
 const { applyWindowDarkMode } = require('./window-dark-mode');
 const { createHotkeys } = require('./hotkey-service');
 const { comboToAccelerator } = require('./hotkeys');
@@ -252,11 +252,15 @@ app.whenReady().then(() => {
     initial: loadTheme(themeFile) || (nativeTheme.shouldUseDarkColors ? 'dark' : 'light'),
     onApplied: (theme) => {
       broadcastTheme(theme);
+      // prefers-color-scheme 跟随应用主题：Notion 日历等姊妹站的「跟随系统」
+      // 外观按此渲染，混合模式系统（浅色应用偏好）下日历也能吃到深色
+      nativeTheme.themeSource = theme;
       if (win) win.setBackgroundColor(theme === 'dark' ? '#191919' : '#ffffff');
       if (win) applyWindowDarkMode(win, theme, { log: dwmLog }); // 单窗口深色非客户区：消除 Win10 无边框窗口最大化时 DWM 残留的 1px 白边
       if (tabs) tabs.setViewsBackground(theme); // 已建视图加载底色同步，防下次加载闪白
     },
   });
+  nativeTheme.themeSource = themeService.get(); // 启动即同步（onApplied 只在上报后触发）
   // 「样式」「设置」子窗口归口（关闭改隐藏缓存，重开即时）。
   // 两页同宽 400（统一回落 baseWidth，设置页不再窄于样式页）；高度一致 585：
   // #form 均可滚动兜底（shared/base-win.css），新增表单行不必再调基准高度
@@ -404,7 +408,12 @@ app.whenReady().then(() => {
   ipcMain.on('window-toggle-maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
   ipcMain.on('window-close', () => win.close());
   ipcMain.on('get-theme', (e) => { e.returnValue = themeService.get(); });
-  ipcMain.on('notion-theme-changed', (_e, theme) => { themeService.report(theme); });
+  ipcMain.on('notion-theme-changed', (e, theme) => {
+    // 姊妹站（calendar.notion.so 等）无 dark class，preload 探针恒报 light——
+    // 只接受 Notion 应用页的上报，防全局主题/theme.json 被洗成 light（实测坑）
+    if (!isThemeProbeUrl(e.sender.getURL())) return;
+    themeService.report(theme);
+  });
 });
 
 app.on('before-quit', () => { isQuitting = true; });

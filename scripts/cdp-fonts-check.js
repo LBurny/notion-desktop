@@ -106,6 +106,31 @@ const PROBE_EXPR = `(() => {
   mathEl.className = 'katex';
   mathWrap.appendChild(mathEl);
   root.appendChild(mathWrap);
+  // 集合视图：整页数据库渲染在 .notion-page-content 之外，条目（行/卡片）归正文、
+  // 视图 chrome（标签/分组头）归界面；条目内代码块需 (0,2,0) 专项夺回等宽（实测坑）
+  const cvb = document.createElement('div');
+  cvb.className = 'notion-collection-view-body';
+  const item = document.createElement('div');
+  item.className = 'notion-collection-item';
+  const itemText = document.createElement('span');
+  itemText.textContent = 'probe';
+  item.appendChild(itemText);
+  const itemCode = document.createElement('div');
+  itemCode.className = 'notion-code-block';
+  const itemCodeText = document.createElement('code');
+  itemCodeText.textContent = 'probe';
+  itemCode.appendChild(itemCodeText); item.appendChild(itemCode);
+  cvb.appendChild(item);
+  const groupHead = document.createElement('span');
+  groupHead.textContent = 'probe';
+  cvb.appendChild(groupHead);
+  const viewTab = document.createElement('div');
+  viewTab.className = 'notion-collection-view-tab';
+  const viewTabText = document.createElement('span');
+  viewTabText.textContent = 'probe';
+  viewTab.appendChild(viewTabText);
+  cvb.appendChild(viewTab);
+  root.appendChild(cvb);
   page.appendChild(root);
   const uiEl = document.createElement('span');
   uiEl.id = '__nd-font-probe-ui';
@@ -122,6 +147,10 @@ const PROBE_EXPR = `(() => {
     code: cs(codeEl),             // 块级代码正文（contenteditable 内）
     inlineCode: cs(inlineSpan),  // 行内代码内部 span（内联 font-family 被 !important 夺回）
     math: cs(mathEl),
+    collItem: cs(itemText),       // 集合视图条目内容 → 正文
+    collItemCode: cs(itemCodeText), // 条目内代码块 → 等宽（特异性夺回）
+    collChrome: cs(groupHead),    // 视图体内非条目（分组头/表头）→ 界面
+    collTab: cs(viewTabText),     // 视图标签 → 界面
     realLeaf: leaf ? cs(leaf) : null,
     realInlineCode: realInline ? cs(realInline) : null,
   };
@@ -171,6 +200,11 @@ async function main() {
   check('真实正文文字叶节点', fonts.realLeaf, want.body); // 特异性 0,2,0 路径：防假绿
   // 页面真实行内代码（若有）：.notion-inline-code-container 内部 span 的计算字体
   if (fonts.realInlineCode) check('真实行内代码', fonts.realInlineCode, want.code);
+  // 集合视图（数据库）：条目内容归正文、chrome 归界面、条目内代码守等宽
+  check('集合视图条目字体', fonts.collItem, want.body);
+  check('集合视图内代码块字体', fonts.collItemCode, want.code);
+  check('集合视图分组头/表头字体', fonts.collChrome, want.ui);
+  check('集合视图标签字体', fonts.collTab, want.ui);
 
   pg.close();
   console.log(failures ? `FAIL (${failures} 项)` : 'PASS');

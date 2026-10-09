@@ -40,6 +40,13 @@ function currentTheme() {
   return dark ? 'dark' : 'light';
 }
 
+// 主题探针只在 Notion 应用页有效：calendar.notion.so 等姊妹站不打 dark class，
+// 探针恒报 light——宽限期后被接受会把全局主题/theme.json 洗成 light（实测坑）。
+// 非应用页停发上报（主进程 isThemeProbeUrl 双保险）；早期底色补丁保留，
+// 配合 themeSource 让日历等「跟随系统」的姊妹站也吃到应用主题
+const THEME_PROBE_RE = /^https:\/\/((www\.)?notion\.so|app\.notion\.com)\//;
+const themeProbeEnabled = THEME_PROBE_RE.test(location.href);
+
 let last = null;
 function report() {
   const t = currentTheme();
@@ -51,6 +58,7 @@ function report() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+  if (!themeProbeEnabled) return;
   report();
   const observer = new MutationObserver(report);
   const opts = { attributes: true, attributeFilter: ['class'] };

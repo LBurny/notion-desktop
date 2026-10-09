@@ -18,7 +18,8 @@ function buildBlock() {
   ];
   for (const name of FUNCS) {
     if (typeof m[name] !== 'function') throw new Error(`topbar-actions 缺少导出: ${name}`);
-    lines.push(m[name].toString());
+    // toString() 带源文件行尾：CRLF 检出的工作区里须归一化，否则永远 stale
+    lines.push(m[name].toString().replace(/\r\n/g, '\n'));
   }
   lines.push(END);
   return lines.join('\n');
@@ -36,7 +37,9 @@ function main() {
     process.exit(2);
   }
   if (check) {
-    const current = src.match(re)[0];
+    // 归一化行尾：检出为 CRLF 的工作区里生成块（LF）会与磁盘内容不等，
+    // 但这不是漂移（曾因此误报 stale）
+    const current = src.match(re)[0].replace(/\r\n/g, '\n');
     if (current !== block) {
       console.error('探针区与 topbar-actions.js 不同源，请运行 npm run sync-probes');
       process.exit(1);

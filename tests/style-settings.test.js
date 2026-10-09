@@ -347,3 +347,40 @@ test('buildSettingsCss 公式槽用户填入优先于 Modern 默认', () => {
   assert.ok(css.includes('"Cambria Math", "KaTeX_Main", "Times New Roman", serif'));
   assert.ok(!css.includes('"Latin Modern Math"'), '用户选择不被 Modern 默认覆盖');
 });
+
+// ── 数据库/集合视图字体覆盖（实测根因：整页数据库渲染在 .notion-page-content 之外，
+//    列表行/看板卡片/表格行挂 .notion-collection-item，视图控件挂专用 chrome 类） ──
+
+test('buildSettingsCss 集合视图：条目内容归正文，视图控件归界面', () => {
+  const css = buildSettingsCss(DEFAULT_SETTINGS);
+  // 条目（列表行/看板卡片/表格行）：内容字体（看板卡片标题无 contenteditable 祖先，
+  // 原有正文选择器全部落空，实测落到 ui-sans-serif）
+  assert.ok(css.includes('.notion-collection-item, .notion-collection-item *'));
+  // 视图标签 / New 按钮 / 过滤排序等 chrome：界面字体（实测落到 ui-sans-serif）
+  assert.ok(css.includes('.notion-collection-view-tab, .notion-collection-view-tab *'));
+  assert.ok(css.includes('.notion-collection-view-tab-button, .notion-collection-view-tab-button *'));
+  assert.ok(css.includes('.notion-collection-view-item-add, .notion-collection-view-item-add *'));
+  assert.ok(css.includes('.notion-collection-filter, .notion-collection-filter *'));
+  assert.ok(css.includes('.notion-collection-sort, .notion-collection-sort *'));
+  // 视图体内非条目元素（看板分组头/表头/空态/底部 New 行）归界面；
+  // :not 排除条目子树，防止条目内容被界面规则抢走
+  assert.ok(css.includes('.notion-collection-view-body :not(.notion-collection-item):not(.notion-collection-item *)'));
+});
+
+test('buildSettingsCss 集合视图内代码块/行内代码：高特异性选择器夺回等宽', () => {
+  // .notion-collection-item * (0,1,0) 正文规则与代码规则同特异性——
+  // 集合视图内的代码需 (0,2,0) 专项，否则代码落到正文字体
+  const css = buildSettingsCss({ ...DEFAULT_SETTINGS, fonts: { body: 'Aa', ui: '', code: '', math: '' } });
+  assert.ok(css.includes('.notion-collection-item .notion-code-block, .notion-collection-item .notion-code-block *'));
+  assert.ok(css.includes('.notion-collection-item .notion-inline-code-container, .notion-collection-item .notion-inline-code-container *'));
+});
+
+test('default.css 全局字体表镜像集合视图选择器（含代码块高特异性夺回）', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'default.css'), 'utf8');
+  assert.ok(css.includes('.notion-collection-item'), '条目内容');
+  assert.ok(css.includes('.notion-collection-view-tab'), '视图标签');
+  assert.ok(css.includes('.notion-collection-view-item-add'), 'New 按钮');
+  assert.ok(css.includes('.notion-collection-view-body :not(.notion-collection-item)'), '视图体内非条目归界面同款');
+  assert.ok(css.includes('.notion-collection-item .notion-code-block *'), '集合内代码块');
+  assert.ok(css.includes('.notion-collection-item .notion-inline-code-container *'), '集合内行内代码');
+});

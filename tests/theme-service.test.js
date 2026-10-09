@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createThemeService, shouldAcceptReport, GRACE_MS } = require('../src/main/theme-service');
+const { createThemeService, shouldAcceptReport, isThemeProbeUrl, GRACE_MS } = require('../src/main/theme-service');
 
 // ── shouldAcceptReport 纯函数 ──
 
@@ -74,4 +74,25 @@ test('宽限期后 light 正常生效', () => {
   assert.equal(svc.report('light'), true);
   assert.equal(svc.get(), 'light');
   assert.deepEqual(applied, ['light']);
+});
+
+// ── isThemeProbeUrl：主题探针只在 Notion 应用页有效 ──
+// calendar.notion.so 等姊妹站没有 dark class，探针会误报 light 污染全局主题（实测坑）
+
+test('isThemeProbeUrl：Notion 应用页放行', () => {
+  assert.equal(isThemeProbeUrl('https://www.notion.so/'), true);
+  assert.equal(isThemeProbeUrl('https://www.notion.so/3db322f5b25c80a5981ee5a3f89a9459'), true);
+  assert.equal(isThemeProbeUrl('https://notion.so/RSS-3c9322f5b25c80acb721cd39951e01b2'), true);
+  assert.equal(isThemeProbeUrl('https://app.notion.com/p/3db322f5b25c80a5981ee5a3f89a9459?v=1'), true);
+});
+
+test('isThemeProbeUrl：姊妹站/仿冒域名拒绝', () => {
+  assert.equal(isThemeProbeUrl('https://calendar.notion.so/'), false);
+  assert.equal(isThemeProbeUrl('https://calendar.notion.com/'), false);
+  assert.equal(isThemeProbeUrl('https://developers.notion.so/'), false);
+  assert.equal(isThemeProbeUrl('https://www.notion.so.evil.com/'), false);
+  assert.equal(isThemeProbeUrl('https://evil.com/?q=www.notion.so'), false);
+  assert.equal(isThemeProbeUrl('file:///H:/x/index.html'), false);
+  assert.equal(isThemeProbeUrl(''), false);
+  assert.equal(isThemeProbeUrl(undefined), false);
 });
