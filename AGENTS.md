@@ -8,6 +8,9 @@ Notion Desktop：notion.so 网页版的 Windows 桌面套壳，Electron 43（Bas
 npm start            # 开发模式启动
 npm test             # node --test，单元测试在 tests/
 npm run dist         # electron-builder 打 NSIS 安装包到 dist/（先杀掉运行中的实例，否则 EBUSY）
+                     # 本机直连 GitHub 有 TLS 拦截，下载 NSIS/winCodeSign 会报
+                     # "self-signed certificate in certificate chain"（打包中断）；加镜像环境变量即可：
+                     # ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ npm run dist
 npm run sync-probes  # content.js 探针生成区 ← topbar-actions.js（单一事实源）
 ND_PERF=1 npm start  # 输出启动/加载里程碑耗时（[perf] 行）
 
