@@ -382,6 +382,7 @@ function createTabs(deps) {
     setViewsBackground,
     warmStandby, disposeStandby: standby.dispose,
     topbarAction: relay.topbarAction,
+    topbarClickApplied: relay.clickApplied,
     // Quick Find 待命交互门面（实现在 quick-find-flow.js）
     newTabInteractive: flow.newTabInteractive,
     quickFindPicked: flow.picked,

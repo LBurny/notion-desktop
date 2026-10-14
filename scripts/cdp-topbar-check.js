@@ -55,7 +55,10 @@ const favStateExpr = `(() => {
 })()`;
 
 async function main() {
-  // 等标题栏与 Notion 页面就绪
+  const isActiveView = async (client) => evalOn(client, `innerWidth > 0 && document.visibilityState === 'visible'`);
+  // 等标题栏与 Notion 页面就绪。/json 会同时列出常驻预热视图（detached：视口 0x0、
+  // visibilityState=hidden，URL 与真实标签同款）——挂到它上面所有断言都会落空
+  // （假绿/假红都出现过），必须挑视口非 0 的活动标签视图
   let tb = null, op = null;
   for (let i = 0; i < 40 && (!tb || !op); i++) {
     const ts = await targets();
@@ -64,8 +67,12 @@ async function main() {
       if (t) tb = await attach(t.webSocketDebuggerUrl);
     }
     if (!op) {
-      const p = ts.find((x) => x.type === 'page' && x.url.startsWith('https://www.notion.so'));
-      if (p) op = await attach(p.webSocketDebuggerUrl);
+      const pages = ts.filter((x) => x.type === 'page' && x.url.startsWith('https://www.notion.so'));
+      for (const p of pages) {
+        const c = await attach(p.webSocketDebuggerUrl);
+        if (await isActiveView(c)) { op = c; break; }
+        c.close();
+      }
     }
     await sleep(1000);
   }

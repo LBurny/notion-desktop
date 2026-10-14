@@ -59,6 +59,27 @@ test('无活动 wc：状态推送 available:false', async () => {
   assert.deepEqual(states, [{ available: false, favorited: null }]);
 });
 
+test('clickApplied(favorite)：按钮懒挂载致点击延后落地时，从点中那刻起重排回读', async () => {
+  const wc = makeWc({ favorite: true });
+  const { relay, states } = setup(wc);
+  relay.topbarAction('favorite');               // 按钮还没挂载：preload 侧正在重试
+  await new Promise((r) => setTimeout(r, 50));  // 兜底定时器（favoriteSettleMs=20）已回读过
+  states.length = 0;
+  relay.clickApplied('favorite');               // 按钮挂载、点击真的落下才回报
+  assert.deepEqual(states, [], '回报后不立即回读（Notion 状态尚未落定）');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual(states, [{ available: true, favorited: true }], '点中后从该时刻重排回读');
+});
+
+test('clickApplied 非 favorite 动作不回读', async () => {
+  const wc = makeWc();
+  const { relay, states } = setup(wc);
+  relay.clickApplied('share');
+  relay.clickApplied('more');
+  await new Promise((r) => setTimeout(r, 50));
+  assert.deepEqual(states, []);
+});
+
 test('schedulePush 防抖合并：连续 3 次只探测一回', async () => {
   const wc = makeWc({ favorite: false });
   const { relay, states } = setup(wc);

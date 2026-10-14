@@ -404,6 +404,12 @@ app.whenReady().then(() => {
     tabs.topbarAction(action);
   });
 
+  // preload 点中顶栏按钮后回报：按钮懒挂载时点击会延后落地，收藏态据此重排回读
+  ipcMain.on('topbar-click-applied', (_e, action) => {
+    if (!/^(sidebar|share|favorite|more)$/.test(action)) return;
+    tabs.topbarClickApplied(action);
+  });
+
   ipcMain.on('window-minimize', () => win.minimize());
   ipcMain.on('window-toggle-maximize', () => (win.isMaximized() ? win.unmaximize() : win.maximize()));
   ipcMain.on('window-close', () => win.close());

@@ -66,6 +66,25 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
   };
 }
 
+// 顶栏点击执行器（非开关动作：Share/☆/⋯）：按钮懒挂载期盲点同样会静默落空——
+// 冷启动实测窗口已出、而 Share/⋯ 按钮要 5~10s 才挂载，这期间 el.click() 被丢弃且不补发
+// （用户症状：点 Share/⋯ 什么也不弹）。与侧栏开关同款退避重试 + gen 闸口防连按互踩，
+// 但窗口放宽到约 13s（顶栏右侧按钮比页面 chrome 更晚挂，实测有 >9s 的慢加载）；
+// isHidden：视图转后台/被遮挡后不再补点，否则浮层会开在后台标签里（切回来莫名多个菜单）。
+function createTopbarClickRunner({ pickTopbarButton, getRoot, sleep, isHidden = () => false, maxAttempts = 16 }) {
+  let gen = 0;
+  return async function clickTopbarAction(cfg) {
+    const myGen = ++gen;
+    for (let n = 0; n < maxAttempts; n++) {
+      if (myGen !== gen || isHidden()) return false; // 又按了一次 / 视图已不可见：本次作废
+      const el = pickTopbarButton(getRoot(), cfg.selectors);
+      if (el) { el.click(); return true; }
+      await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 13s）
+    }
+    return false;
+  };
+}
+
 // Quick Find 浮层状态：open = 带输入框的搜索浮层已开；anyDialog = 有任何
 // role=dialog（含"在桌面应用打开？"推广条——它也会挡快捷键）
 function quickFindStateOf(root) {
@@ -107,6 +126,7 @@ function spaNavigate(doc, url) {
 
 module.exports = {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
+  createTopbarClickRunner,
   favoriteStateOf, quickFindStateOf,
   uiFontOf, UI_FONT_SELECTORS, spaNavigate,
 };

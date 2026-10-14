@@ -12,9 +12,22 @@ function createTopbarRelay({
   async function topbarAction(action) {
     const wc = getActiveWc();
     if (!wc) { schedulePush(); return; }
-    // 只发动作名：选择器表/开关重试逻辑在 preload 探针区（生成自 topbar-actions.js）
+    // 只发动作名：选择器表/按钮懒挂载重试逻辑在 preload 探针区（生成自 topbar-actions.js）
     try { wc.send('topbar-click', action); } catch { /* 视图销毁则忽略 */ }
-    if (action === 'favorite') setTimeout(pushNow, favoriteSettleMs); // 等 Notion 落状态再回读
+    if (action === 'favorite') settlePush(); // 兜底：preload 未回报（视图销毁等）也回读一次
+  }
+
+  // 收藏态在点击**真的落下**之后才回读：按钮懒挂载时 preload 会重试到挂载才点中，
+  // 固定延时可能早于点击（回读到旧状态）。clickApplied 由 preload 点中后回报，
+  // 重排回读定时器（点得早就与固定延时同刻，只多探一次约 1ms）。
+  let settleTimer = null;
+  function settlePush() {
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(pushNow, favoriteSettleMs);
+  }
+
+  function clickApplied(action) {
+    if (action === 'favorite') settlePush();
   }
 
   async function probeState() {
@@ -56,7 +69,7 @@ function createTopbarRelay({
     return undefined;
   }
 
-  return { topbarAction, schedulePush, pushNow, probeUiFont };
+  return { topbarAction, clickApplied, schedulePush, pushNow, probeUiFont };
 }
 
 module.exports = { createTopbarRelay };

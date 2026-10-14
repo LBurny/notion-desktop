@@ -159,6 +159,19 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
     }
   };
 }
+function createTopbarClickRunner({ pickTopbarButton, getRoot, sleep, isHidden = () => false, maxAttempts = 16 }) {
+  let gen = 0;
+  return async function clickTopbarAction(cfg) {
+    const myGen = ++gen;
+    for (let n = 0; n < maxAttempts; n++) {
+      if (myGen !== gen || isHidden()) return false; // 又按了一次 / 视图已不可见：本次作废
+      const el = pickTopbarButton(getRoot(), cfg.selectors);
+      if (el) { el.click(); return true; }
+      await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 13s）
+    }
+    return false;
+  };
+}
 function favoriteStateOf(root, selectors) {
   const el = pickTopbarButton(root, selectors);
   if (!el) return null;
@@ -202,12 +215,23 @@ const sidebarToggle = createSidebarToggleRunner({
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
 });
 
+// 非开关动作（Share/☆/⋯）：同样重试到按钮挂载（冷启动实测按钮比窗口晚 5~10s 才到，
+// 期间点空既不弹浮层也不补发）；点中才回报主进程——收藏态要等点击真的落下再回读。
+// 视图转后台即放弃补点：否则浮层会开在后台标签里，切回来时莫名多一个菜单
+const topbarClick = createTopbarClickRunner({
+  pickTopbarButton,
+  getRoot: () => document,
+  sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  isHidden: () => document.visibilityState !== 'visible',
+});
+
 ipcRenderer.on('topbar-click', (_e, action) => {
   const cfg = TOPBAR_ACTIONS[action];
   if (!cfg) return;
   if (cfg.toggle) { sidebarToggle(cfg); return; }
-  const el = pickTopbarButton(document, cfg.selectors);
-  if (el) el.click();
+  topbarClick(cfg).then((clicked) => {
+    if (clicked) ipcRenderer.send('topbar-click-applied', action);
+  });
 });
 
 ipcRenderer.on('topbar-favorite-query', (_e, selectors) => {

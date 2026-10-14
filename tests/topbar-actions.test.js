@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   TOPBAR_ACTIONS, pickTopbarButton, sidebarStateOf, createSidebarToggleRunner,
+  createTopbarClickRunner,
   favoriteStateOf, quickFindStateOf, uiFontOf, UI_FONT_SELECTORS,
 } = require('../src/main/topbar-actions');
 
@@ -129,6 +130,74 @@ test('toggleRunner：新一次点击作废旧重试循环（gen 闸口）', asyn
   await Promise.all([t1, t2]);
   // 旧循环作废不再点；新循环点满 maxAttempts=3 次（首次 + 2 次重试）后放弃
   assert.equal(page.openClicks, 1 + 3);
+});
+
+// 顶栏点击执行器（Share/☆/⋯）：按钮懒挂载期点空会静默落空（用户报的"点 Share/⋯ 不弹"）
+function stubActionPage({ mounted = true } = {}) {
+  const page = { mounted, clicks: 0, el: null };
+  page.el = { click() { page.clicks++; } };
+  const root = {
+    querySelector: (sel) => (sel === '.btn' && page.mounted ? page.el : null),
+  };
+  return { page, root };
+}
+
+test('clickRunner：按钮已挂载时立即点一次', async () => {
+  const { page, root } = stubActionPage();
+  const click = createTopbarClickRunner({
+    pickTopbarButton, getRoot: () => root, sleep: () => Promise.resolve(),
+  });
+  assert.strictEqual(await click({ selectors: ['.btn'] }), true);
+  assert.equal(page.clicks, 1);
+});
+
+test('clickRunner：按钮懒挂载时重试到挂载再点（冷启动窗口期不丢点击）', async () => {
+  const { page, root } = stubActionPage({ mounted: false });
+  let sleeps = 0;
+  const sleep = () => { sleeps++; if (sleeps === 4) page.mounted = true; return Promise.resolve(); };
+  const click = createTopbarClickRunner({ pickTopbarButton, getRoot: () => root, sleep });
+  assert.strictEqual(await click({ selectors: ['.btn'] }), true);
+  assert.equal(page.clicks, 1, '挂载后只点一次');
+  assert.ok(sleeps >= 4, '应重试过若干次');
+});
+
+test('clickRunner：按钮始终不挂载时有界放弃，不无限重试', async () => {
+  const { page, root } = stubActionPage({ mounted: false });
+  const click = createTopbarClickRunner({
+    pickTopbarButton, getRoot: () => root, sleep: () => Promise.resolve(), maxAttempts: 3,
+  });
+  assert.strictEqual(await click({ selectors: ['.btn'] }), false);
+  assert.equal(page.clicks, 0);
+});
+
+test('clickRunner：新一次点击作废旧重试循环（gen 闸口，防重试期连按点两下）', async () => {
+  const { page, root } = stubActionPage({ mounted: false });
+  const gates = [];
+  const sleep = () => new Promise((r) => gates.push(r));
+  const click = createTopbarClickRunner({
+    pickTopbarButton, getRoot: () => root, sleep, maxAttempts: 5,
+  });
+  const t1 = click({ selectors: ['.btn'] }); // 挂起在 sleep（按钮未挂载）
+  const t2 = click({ selectors: ['.btn'] }); // gen 递增，旧循环作废
+  page.mounted = true;                        // 挂载完成
+  for (let i = 0; i < 10 && gates.length; i++) {
+    while (gates.length) gates.shift()();
+    await Promise.resolve();
+  }
+  assert.deepEqual(await Promise.all([t1, t2]), [false, true]);
+  assert.equal(page.clicks, 1, '两次按下只点一次（旧的作废，新的点中即停）');
+});
+
+test('clickRunner：视图转后台即放弃补点（防浮层开在后台标签里）', async () => {
+  const { page, root } = stubActionPage({ mounted: false });
+  let hidden = false;
+  const sleep = () => { hidden = true; return Promise.resolve(); }; // 第一次等待期间切走
+  const click = createTopbarClickRunner({
+    pickTopbarButton, getRoot: () => root, sleep, isHidden: () => hidden, maxAttempts: 5,
+  });
+  assert.strictEqual(await click({ selectors: ['.btn'] }), false);
+  page.mounted = true;
+  assert.equal(page.clicks, 0, '切走后即使按钮挂载也不再补点');
 });
 
 test('favoriteStateOf 按 svg.starFill/star 判态，按钮缺失返回 null', () => {
