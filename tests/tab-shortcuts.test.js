@@ -46,3 +46,17 @@ test('配置下 Ctrl+Tab/PageDown/数字位 仍可用且不受改键影响', () 
   assert.deepStrictEqual(shortcutFor(kd('Tab'), hk), { action: 'next-tab' });
   assert.deepStrictEqual(shortcutFor(kd('1'), hk), { action: 'position', position: 1 });
 });
+
+// 设置页允许捕获 Alt 组合（HOTKEY_RE 认 Ctrl/Alt/Shift），但旧实现先按 Ctrl 闸口
+// 早退，Alt 组合永远匹配不到——用户改成 Alt+T 后按键静默失效。
+test('可配置新建/关闭标签：Alt 组合也生效', () => {
+  const hk = { newTab: 'Alt+T', closeTab: 'Alt+W' };
+  assert.deepStrictEqual(shortcutFor(kd('t', { control: false, alt: true }), hk), { action: 'new-tab' });
+  assert.deepStrictEqual(shortcutFor(kd('w', { control: false, alt: true }), hk), { action: 'close-tab' });
+});
+
+test('可配置新建/关闭标签：Ctrl+Alt 组合与功能键也生效', () => {
+  const hk = { newTab: 'Ctrl+Alt+N', closeTab: 'Ctrl+Shift+F4' };
+  assert.deepStrictEqual(shortcutFor(kd('n', { alt: true }), hk), { action: 'new-tab' });
+  assert.deepStrictEqual(shortcutFor(kd('F4', { shift: true }), hk), { action: 'close-tab' });
+});

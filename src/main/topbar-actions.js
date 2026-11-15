@@ -47,7 +47,9 @@ function sidebarStateOf(root) {
 // 侧栏开关执行器：状态感知选方向 + 效果校验重试。方向一次定死（按下时的反态），
 // 同向重复点击天然幂等（生效后对应按钮消失）；每轮先查是否已翻转再决定点不点。
 // gen 闸口：新一次按下作废旧重试循环，防并发互踩。依赖注入以便单测。
-function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, sleep, maxAttempts = 12 }) {
+// isHidden：与顶栏点击执行器同理——视图转后台后停止补点，否则切走的标签在后台
+// 反复点 ☰/收钮，回到该标签时侧栏状态（Notion 客户端共享状态）已被莫名改掉。
+function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, sleep, isHidden = () => false, maxAttempts = 12 }) {
   let gen = 0;
   return async function toggleSidebar(cfg) {
     const myGen = ++gen;
@@ -58,7 +60,7 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
       return wantOpen ? s === 'open' : s === 'closed';
     };
     for (let n = 0; n < maxAttempts; n++) {
-      if (myGen !== gen || flipped()) return;
+      if (myGen !== gen || isHidden() || flipped()) return;
       const el = pickTopbarButton(getRoot(), sels);
       if (el) el.click();
       await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 9s）

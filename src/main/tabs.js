@@ -236,8 +236,12 @@ function createTabs(deps) {
           return { action: 'deny' };
       }
     });
-    wc.on('did-fail-load', (_e, _code, _desc, validatedURL, isMainFrame) => {
-      if (isMainFrame && validatedURL.startsWith('http')) {
+    wc.on('did-fail-load', (_e, errorCode, _desc, validatedURL, isMainFrame) => {
+      // ERR_ABORTED(-3) 是「导航被中止」，不是加载失败：页面 window.stop()、导航被后续
+      // 导航取代、下载/协议处理打断等正常浏览都会出现；按失败处理会把错误页盖到正常
+      // 页面上。只有真实网络/协议错误才显示重试页。
+      if (errorCode === -3) return;
+      if (isMainFrame && typeof validatedURL === 'string' && validatedURL.startsWith('http')) {
         wc.loadFile(errorPagePath);
       }
     });
@@ -294,7 +298,12 @@ function createTabs(deps) {
     onChanged();
     if (search) {
       const rec = records.get(tab.id);
-      rec.view.webContents.once('did-finish-load', () => flow.trigger(rec.view, { dismissFirst: true }));
+      const wc = rec.view.webContents;
+      const fire = () => flow.trigger(rec.view, { dismissFirst: true });
+      // 认领已加载完的预热视图（或极快命中缓存）不会再发 did-finish-load，等它等于永不唤起；
+      // 仍在加载的冷加载视图则必须等首帧，否则注入的 Ctrl+K 会被页面丢掉
+      if (typeof wc.isLoading === 'function' && !wc.isLoading()) fire();
+      else wc.once('did-finish-load', fire);
     }
     return tab.id;
   }

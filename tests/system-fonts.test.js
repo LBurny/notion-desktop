@@ -59,6 +59,18 @@ test('parseRegOutput 拆分 TTC 合并注册项（A & B）', () => {
   assert.ok(fonts.includes('Microsoft YaHei UI Light'));
 });
 
+// 不少第三方安装的字体（DejaVu / ESSTIX / 旧 bitmap 族）在注册表里写成
+// "(True Type)"（带空格），旧正则只认 "(TrueType)"，字体下拉里会混进
+// 「DejaVuSans-Bold (True Type)」这类不可用的假名字（本机实测 60 条）
+test('parseRegOutput 剥离 "(True Type)"（带空格）等类型后缀', () => {
+  const text = '    DejaVuSans-Bold (True Type)    REG_SZ    DejaVuSans-Bold.ttf\r\n'
+    + '    ESSTIX10 (True Type)    REG_SZ    ESSTIX10.pfb\r\n'
+    + '    MaplePi (True Type)    REG_SZ    MaplePi.pfb\r\n';
+  const fonts = parseRegOutput(text);
+  assert.ok(!fonts.some((f) => /\(/.test(f)), `仍有未剥离的类型后缀: ${fonts.join(',')}`);
+  assert.deepEqual(fonts, ['DejaVuSans-Bold', 'ESSTIX10', 'MaplePi']);
+});
+
 test('mergeFontLists 合并去重并按中文排序', () => {
   const merged = mergeFontLists(['Georgia', '微软雅黑'], ['Arial', '微软雅黑', '宋体']);
   assert.deepEqual([...merged].sort(), ['Arial', 'Georgia', '宋体', '微软雅黑'].sort());

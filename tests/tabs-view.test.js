@@ -24,22 +24,33 @@ function setup({ theme = 'dark' } = {}) {
       this.cssKeys = 0;
       this._loads = 0;
       this._spaNavUrl = null;
+      this._finished = false;  // did-finish-load 已触发（isLoading 用）
+      this._inputs = [];       // 注入按键的 keyCode
+      this._files = [];        // loadFile 记录（错误页）
       this.session = { _downloads: [], downloadURL(u) { this._downloads.push(u); } };
     }
-    loadURL(u) { this._url = u; this._loads++; }
-    loadFile() {}
-    on(ev, fn) { if (ev === 'dom-ready') this._dom = fn; if (ev === 'did-finish-load') this._finish = fn; if (ev === 'before-input-event') this._bie = fn; }
-    once() {}
+    loadURL(u) { this._url = u; this._loads++; this._finished = false; }
+    loadFile(p) { this._files.push(p); }
+    on(ev, fn) {
+      if (ev === 'dom-ready') this._dom = fn;
+      if (ev === 'did-finish-load') { this._finish = () => { this._finished = true; fn(); }; }
+      if (ev === 'before-input-event') this._bie = fn;
+      if (ev === 'did-fail-load') this._fail = fn;
+    }
+    once(ev, fn) { if (ev === 'did-finish-load') { this._onceFinish = fn; } }
     send(ch, payload) {
       if (ch === 'spa-navigate') this._spaNavUrl = payload;
       else if (ch === 'location-href-query') emitReply('location-href', this, this._href);
+      // 浮层探针：默认「无浮层」，让 Quick Find 注入路径走捷径（无 400ms 超时等待）
+      else if (ch === 'quick-find-state-query') emitReply('quick-find-state', this, { open: false, anyDialog: false });
     }
-    sendInputEvent() {}
+    sendInputEvent(ev) { if (ev && ev.type === 'keyDown') this._inputs.push(ev.keyCode); }
     insertCSS() { return Promise.resolve('k' + ++this.cssKeys); }
     removeInsertedCSS() { return Promise.resolve(); }
     setZoomFactor() {}
     setWindowOpenHandler(fn) { this._openHandler = fn; }
     setBackgroundColor() {}
+    isLoading() { return !this._finished; }
     isDestroyed() { return false; }
     getURL() { return this._url; }
     getTitle() { return ''; }
@@ -253,4 +264,50 @@ test('window-open：登录弹窗仍放行 allow', () => {
   const wc = created[0].webContents;
   const url = 'https://accounts.google.com/o/oauth2/auth?client_id=1';
   assert.deepEqual(wc._openHandler({ url }), { action: 'allow' });
+});
+
+// ── Ctrl+T 回落路径：认领已加载的预热视图后必须立刻唤起 Quick Find ──
+// newTab(url,{search}) 旧实现只挂 once('did-finish-load')；认领的预热视图已经加载完
+// （且目标就是首页，不触发 SPA 跳转），该事件永远不会再来 → 新标签开了但搜索浮层不弹。
+test('newTab({search})：认领已加载视图后立即唤起 Quick Find', async () => {
+  const { tabs, created } = setup();
+  tabs.warmStandby();
+  created[0].webContents._dom();
+  created[0].webContents._finish(); // 预热就绪
+  tabs.newTab('https://www.notion.so/Page1'); // 认领预热 → 后台重建（created[1]）
+  created[1].webContents._dom();
+  created[1].webContents._finish(); // 第二个预热也就绪
+  // 活动页停在错误页（newTabInteractive 的回退条件）
+  tabs.activeView().webContents._url = 'file:///error.html';
+
+  tabs.newTabInteractive();
+  const wc = tabs.activeView().webContents;
+  assert.strictEqual(wc, created[1].webContents, '新标签应认领预热视图');
+  await new Promise((r) => setTimeout(r, 80));
+  assert.ok(wc._inputs.includes('k'), `认领已加载视图后必须注入 Ctrl+K，实际注入: ${wc._inputs.join(',') || '无'}`);
+});
+
+test('newTab({search})：冷加载视图不提前注入（等首帧加载完）', () => {
+  const { tabs } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const active = tabs.activeView().webContents;
+  active._url = 'file:///error.html'; // 触发回退路径；无预热 → 冷加载
+  tabs.newTabInteractive();
+  const cold = tabs.activeView().webContents;
+  assert.notStrictEqual(cold, active, '冷路径应新建视图');
+  assert.equal(cold.isLoading(), true, '新视图仍在加载');
+  assert.deepEqual(cold._inputs, [], '加载完成前不得注入按键');
+});
+
+// ── did-fail-load：被中止的导航不是加载失败 ──
+// ERR_ABORTED(-3) 在正常浏览中频繁出现（页面 window.stop、导航被后续导航取代、
+// 下载/协议处理中断等）。只按 isMainFrame 判失败会把错误页盖到正常页面上。
+test('did-fail-load：ERR_ABORTED(-3) 不显示错误页，真实网络错误才显示', () => {
+  const { tabs, created } = setup();
+  tabs.newTab('https://www.notion.so/Page1');
+  const wc = created[0].webContents;
+  wc._fail({}, -3, 'ERR_ABORTED', 'https://www.notion.so/Page2', true);
+  assert.deepEqual(wc._files, [], '被中止的导航不得加载 error.html');
+  wc._fail({}, -106, 'ERR_INTERNET_DISCONNECTED', 'https://www.notion.so/Page3', true);
+  assert.deepEqual(wc._files, ['error.html'], '真实失败才显示错误页');
 });

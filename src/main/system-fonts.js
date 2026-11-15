@@ -16,7 +16,9 @@ function parseRegOutput(text) {
   for (const line of String(text || '').split(/\r?\n/)) {
     const m = line.match(/^\s+(.+?)\s+REG_SZ\s+/);
     if (!m) continue;
-    const raw = m[1].replace(/\s+\((TrueType|OpenType|PostScript)\)\s*$/, '').trim();
+    // 注册表里类型后缀写法不统一：微软自带字体写 "(TrueType)"，第三方安装器常写
+    // "(True Type)"（带空格）——只认前者会让字体下拉混进 60 条「xxx (True Type)」假名字
+    const raw = m[1].replace(/\s+\(\s*(True\s*Type|OpenType|PostScript)\s*\)\s*$/i, '').trim();
     if (!raw) continue;
     // TTC 合集在注册表是一条 'A & B'，拆成独立字族（Word 也分别列出）
     for (const name of raw.split(/\s+&\s+/)) {

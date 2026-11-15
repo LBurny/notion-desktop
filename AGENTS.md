@@ -24,17 +24,26 @@ node scripts/cdp-topbar-cold-check.js 9222 more
 npx electron scripts/preview-menu.js [menu|style|settings|tabs]
 ```
 
+仓库没有 lint/typecheck/formatter 配置（无 eslint/tsconfig/prettier），`npm test`（`node --test`）是唯一自动门禁：改逻辑先补 `tests/` 用例，纯逻辑尽量抽成可单测的函数（多数 src/main 模块顶部就是纯函数 + 底部导出）。
+
 ## 结构
 
 ```
 src/main/       主进程：index.js 只剩装配；结构归口到独立模块——
                 tabs.js 视图生命周期与导航（状态机在 tab-manager.js）；
                 quick-find-flow.js「新建标签」待命状态机（Quick Find 选中才开标签）；
+                quick-find.js 选中结果 URL 归一化（只放行 notion.so 站内）；
                 topbar-relay.js 顶栏动作转发/收藏回读/界面字体探测；
-                theme-service.js 主题归口（宽限期/落盘/广播）；settings-windows.js
-                样式/设置子窗口（关闭改隐藏缓存）；hotkey-service.js 全局快捷键；
+                theme-service.js 主题归口（宽限期/落盘/广播）+ theme-store.js 持久化；
+                settings-windows.js 样式/设置子窗口（关闭改隐藏缓存）；hotkey-service.js
+                全局快捷键 + hotkeys.js 组合键→accelerator + tab-shortcuts.js 标签按键映射；
+                slash-commands.js 斜杠命令（insertText + SendKeys 真实 Enter）；
                 style-settings.js 设置清洗+CSS 生成；system-fonts.js 注册表字体枚举；
                 request-filter.js 遥测/广告域名黑名单拦截（persist:notion 会话）；
+                standby-view.js 预热视图（新标签认领，SPA 内导航瞬时跳转）；
+                single-instance.js / menu-position.js / window-state.js / login-item.js /
+                close-action.js / window-dark-mode.js——依次负责单实例锁 / 托盘定位 /
+                窗口几何落盘 / 开机自启 / 主窗关闭决策 / 深色非客户区；
                 css-manager.js 合并 CSS 缓存；perf.js 里程碑观测；debounce.js 防抖
 src/preload/    contextBridge 桥：content.js（Notion 页，探针区为生成块）、
                 titlebar.js、settings.js、tray-menu.js
@@ -44,8 +53,15 @@ assets/         default.css 注入样式；icon.ico/icon.png/tray.png 由
                 scripts/render-icon.js 从 build/icon.svg 离屏渲染（ico 内嵌 16–256 七档，
                 Windows 按 DPI 自选尺寸，高分屏任务栏/Alt-Tab 不糊；tray.png 32px 同理）
 tests/          node:test 单测（新逻辑先写测试）
-scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（探针生成器）
+scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（探针生成器）。
+                按现象找看护脚本：cdp-tabs-check（标签）、cdp-sidebar-check（侧栏开关）、
+                cdp-topbar-check / cdp-topbar-cold-check（顶栏按钮，后者专测懒挂载抢点）、
+                cdp-quickfind-check（Quick Find 浮层）、cdp-slash-check（斜杠命令）、
+                cdp-fonts-check（字体选择器的真实叶节点断言）、cdp-host-timing（域名耗时取证）、
+                cdp-perf-probe（启动里程碑）、preview-menu（渲染层截图）、render-icon（图标）
 ```
+
+`scripts/*.js` 里的 `cdp-*-scan/tree/probe/shot` 是排障时的一次性取证脚本，改动逻辑不必维护它们；断言型 `*-check` 脚本要随修复同步更新。
 
 用户数据在 `%APPDATA%/notion-desktop/`（style-settings.json、tabs.json、custom.css、window-state.json）。
 
@@ -75,8 +91,9 @@ scripts/        CDP 调试/端到端/截图脚本 + build-preload-probes.js（�
 - **子页面设计规范**：新增设置类子页面照现有两页模板——HTML 用 `#win`（背景/圆角/裁剪）+ `#titlebar` + `#form` 结构，先引 `../shared/base-win.css` 再引页面 `style.css`（页面文件只放特有控件，禁止把共享规则复制回页面，tests/ui-css.test.js 有防回潮断言）；表单行 `.row` + `.name`（标签列 92px、控件高 28px、行距 12px），分组用 `.section`（首区 `.first` 无分隔线），多选一用 `.segmented` 分段控件（共享）；UA 原生控件（number 调节钮/滚动条）明暗靠主题块的 `color-scheme`（缺了暗色下 spinner 是白底）；原生弹层控件（select/datalist）不跟主题必须自绘（参照字体下拉）。**文案一律走 i18n**：静态文本/占位符/tooltip 在元素上标 `data-i18n` / `data-i18n-placeholder` / `data-i18n-title`，JS 动态文案用 `window.i18n.t(lang, key)`；字典在 `shared/i18n.js`（UMD），新增 key 中英两条同步加（tests/i18n.test.js 校验 key 集一致）；新渲染页引 `../shared/i18n.js`，语言解析 `resolveLanguage(settings.language, systemLocale())`（auto 时非 zh 系统一律英文），语言切换走 `language-changed` 广播即时重渲染（标题栏随 style-changed 的设置自行解析）。**渲染页共享设置快照的坑**：onLanguage 里必须重新 `settingsApi.get()` 刷新本地 settings，否则另一窗口改过的字段会被本窗之后的 commit 写回旧值。
 - **开机静默启动（login-item.js）**：`syncLoginItem(app, enabled)` 写注册表 Run 键（带 `--silent-start` 参数，仅 `app.isPackaged` 时执行，开发态不污染）；`shouldStartHidden` = wasOpenedAtLogin 或 argv 含标记（双保险），为真则 createWindow `show:false` 不弹主窗（托盘/全局快捷键照常）。设置页「启动」分区勾选即存 `launchAtLogin` 并在 `style-settings-update` 里同步登录项。
 - **托盘菜单动作分派在 tray-actions.js（纯函数）**：`open` 才 `win.show()`；style/settings 只开子窗口——主窗最小化到托盘时不连带唤醒（曾无条件 `win.show()`，开设置就弹主窗）；分派表由 tests/tray-actions.test.js 看护。
+- **关闭窗口=退出程序的退出路径（close-action.js，实测坑）**：`closeAction='quit'` 不能只靠「放行关闭 → `window-all-closed` → `app.quit()`」。托盘菜单窗与缓存的样式/设置窗是**隐藏但未销毁**的 BrowserWindow，它们让 `window-all-closed` 永不触发：主窗消失、进程残留，之后点托盘图标/按显隐键会对已销毁的 `win` 抛 `Object has been destroyed`（Electron 43 已实测复现）。决策归 close-action.js 的 `windowClosePlan`，quit 分支必须主动 `app.quit()`（用 `setImmediate` 避免在 close 事件栈里重入）；托盘/全局快捷键回调统一过 `winAlive()` 闸口。tests/close-action.test.js 看护决策表。
 - **公式默认字体优先 Times New Roman**：`pickMathDefaultFont`（font-detect.js）优先返回已装的 Times New Roman（Windows 几乎必装，与正文拉丁字体一致）；未装才回落 Modern 系模糊匹配——名字含 `modern` 才入候选，`math` 仅系内加权（只看 math 会被 Windows 必装的 Cambria Math 抢位，实测坑，占位符曾显示"默认：Cambria Math"）；Times New Roman 与 Modern 系都没装才完全交给 default.css 的 KaTeX_Main。`buildSettingsCss` 第二参数传已装字体表（index.js `getSystemFontsCached` 共享注册表枚举缓存）；用户填入的字体名只 `cleanFontName` 一次（再经 customFontChain 二次 trim 会改变清洗结果）；回退栈 `MATH_FONT_FALLBACKS` 与已选字体 `normalizeFontName` 去重，避免默认 Times New Roman 在链中重复。**行内公式选择器**：`MATH_SELECTORS` 里 `.notion-text-block .katex:not(.katex-display .katex)` (0,4,0) 复用 default.css 同特异性 `:not` 选择器压过 custom.css 旧副本；通用 `.katex:not(.katex-display .katex)` (0,3,0) 覆盖标题/列表/引用/Callout 等其它块里的行内公式（这些块无 custom.css 公式规则，只需压过正文 (0,2,0)）——只覆盖 `.notion-text-block` 会导致非段落块的行内公式落到正文字体。
-- **主题探测与持久化**：Notion 账户主题要等 JS 就绪后才打 dark class，启动早期探测恒为 light——持久化（theme.json，theme-store.js）优先于 `nativeTheme.shouldUseDarkColors`（混合模式系统拿到的是浅色）；启动 15s 宽限期内忽略与持久化 dark 冲突的 light 上报，否则 theme.json 被假象污染。加载期白闪双保险：视图 `backgroundColor` + content.js 的 document-start 早期 `<style>html{background:#191919}`（sendSync get-theme 取值，主题反转时摘除）。**`report()` 收到有效主题即便与当前相同也触发 `onApplied`（只在变化时落盘）**：持久化 dark 时启动早期那次 NC 设置可能因窗口尚未就绪而未生效，Notion 上报 dark（窗口已就绪）时需要这次重设机会——否则 Win10 无边框窗口 1px 白边会一直残留（跨机器时序差异根因，曾误判为 DWM 属性号问题）。**主题上报按域名闸口（theme-service.js `isThemeProbeUrl`，实测坑）**：preload 探针跑在所有页面，但 dark class 只有 Notion 应用页（www.notion.so / notion.so / app.notion.com）才打——calendar.notion.so 等姊妹站恒报 light，15s 宽限期后会把全局主题和 theme.json 洗成 light。content.js 按 `location.href` 停发非应用页上报，主进程 `notion-theme-changed` 处理器再按 `e.sender.getURL()` 双保险丢弃。**`nativeTheme.themeSource` 跟随应用主题**（启动一次 + onApplied 每次）：姊妹站（Notion 日历「跟随系统」外观）与任意页面的 `prefers-color-scheme` 按应用主题渲染，混合模式系统（浅色应用偏好）下日历也能吃到深色；Notion 主站用自家 class 主题、不受 media query 影响。
+- **主题探测与持久化**：Notion 账户主题要等 JS 就绪后才打 dark class，启动早期探测恒为 light——持久化（theme.json，theme-store.js）优先于 `nativeTheme.shouldUseDarkColors`（混合模式系统拿到的是浅色）；启动 15s 宽限期内忽略与持久化 dark 冲突的 light 上报，否则 theme.json 被假象污染。加载期白闪双保险：视图 `backgroundColor` + content.js 的 document-start 早期 `<style>html{background:#191919}`（sendSync get-theme 取值，主题反转时摘除）。**`report()` 收到有效主题即便与当前相同也触发 `onApplied`（只在变化时落盘）**：持久化 dark 时启动早期那次 NC 设置可能因窗口尚未就绪而未生效，Notion 上报 dark（窗口已就绪）时需要这次重设机会——否则 Win10 无边框窗口 1px 白边会一直残留（跨机器时序差异根因，曾误判为 DWM 属性号问题）。**主题上报按域名闸口（theme-service.js `isThemeProbeUrl`，实测坑）**：preload 探针跑在所有页面，但 dark class 只有 Notion 应用页（www.notion.so / notion.so / app.notion.com）才打——calendar.notion.so 等姊妹站恒报 light，15s 宽限期后会把全局主题和 theme.json 洗成 light。content.js 按 `location.href` 停发非应用页上报，主进程 `notion-theme-changed` 处理器再按 `e.sender.getURL()` 双保险丢弃。**`nativeTheme.themeSource` 跟随应用主题**（启动一次 + onApplied 每次）：姊妹站（Notion 日历「跟随系统」外观）与任意页面的 `prefers-color-scheme` 按应用主题渲染，混合模式系统（浅色应用偏好）下日历也能吃到深色；Notion 主站用自家 class 主题、不受 media query 影响。**宽限期内被拒的 light 上报由 theme-service 记下、宽限期结束时自行重采**：preload 只在主题**变化**时上报（content.js 的 `last`），那次被拒后若页面一直就是 light 便再无重报机会——不补这一手，持久化 dark + 账户浅色的组合会永久「外壳深、页面浅」（theme-service 的 `schedule/cancel` 可注入以便单测）。
 - **单窗口深色非客户区（window-dark-mode.js，跨机器普适性坑）**：消除 Win10 无边框窗口（frame:false）最大化时 DWM 残留的 1px 白边——对窗口 HWND 调 `DwmSetWindowAttribute(DWMWA_USE_IMMERSIVE_DARK_MODE)`，不动系统主题、不影响其他程序。**属性号跨版本变过**：Win10 2004（build 19041+）为 20，更早版本（1909 等）为 19，**先试 20、返回非 0 再退 19**，只发 20 在旧 build 机器上会静默失效。**实现用 koffi 原生 FFI（N-API 预编译）直调**，不走 PowerShell——曾用 `Add-Type` 内联编译 C#，但部分机器上编译失败（受限语言模式 CLM / 缺 csc.exe / 安全软件拦截），`[DwmApi]` 类型不存在、调用抛「找不到类型」非终止错误、返回值留空，白边残留（v0.2.8 弃用）。koffi 是 `dependencies`，原生二进制在 `@koromix/koffi-win32-x64`（optionalDependency），`asarUnpack` 必须含 `node_modules/@koromix/**`（否则 .node 在 asar 里加载失败）。**HWND 传参坑（实测）**：`getNativeWindowHandle()` 返回「存有 HWND 值的 Buffer」，koffi 的 `void*` 参数要指针值本身——`readBigInt64LE(0)` 读 BigInt 再 `koffi.as(n, 'void*')` 转指针，直接传 Buffer 会传成 Buffer 地址（返回 E_HANDLE）。调用点：index.js 窗口创建后一次 + themeService.onApplied 每次**有效上报**（含主题未变的重设）——同 build(19045) 机器一台生效一台不生效的真因曾是 theme-service 重设时机（持久化 dark 时早期 NC 调用因窗口未就绪未生效，Notion 上报 dark 又被"主题未变"去重不重设，v0.2.7 修）。改 koffi 路径必须测 `tests/window-dark-mode.test.js` 的 koffi 用例（含 toPtr 转换）。
 - **不要提交**：dist/、node_modules/、.playwright-mcp/、docs/superpowers/（均已 gitignore）。
 

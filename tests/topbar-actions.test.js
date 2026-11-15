@@ -111,6 +111,26 @@ test('toggleRunner：按钮始终不挂载时有限次放弃，不无限重试',
   assert.equal(page.openClicks, 0, '按钮不存在，一次也没点成');
 });
 
+// 与顶栏点击执行器同款：视图转后台后不再补点。否则用户点了 ☰ 后立刻切标签，
+// 被切走的标签会在 9s 窗口里反复点开/收起侧栏（Notion 侧栏状态是客户端共享的）
+test('toggleRunner：视图转后台（isHidden）后停止补点', async () => {
+  const { page, root } = stubSidebarPage({ x: 0, closeMounted: false });
+  let hidden = false;
+  let sleeps = 0;
+  const sleep = () => {
+    sleeps++;
+    if (sleeps === 2) hidden = true; // 第 2 次等待期间用户切走了标签
+    return Promise.resolve();
+  };
+  const toggle = createSidebarToggleRunner({
+    pickTopbarButton, sidebarStateOf, getRoot: () => root, sleep,
+    isHidden: () => hidden,
+  });
+  await toggle(TOPBAR_ACTIONS.sidebar);
+  assert.equal(page.closeClicks, 0, '转后台后不得再点侧栏按钮');
+  assert.ok(sleeps <= 3, `应尽早停轮，实际等待 ${sleeps} 次`);
+});
+
 test('toggleRunner：新一次点击作废旧重试循环（gen 闸口）', async () => {
   const { page, root } = stubSidebarPage({ x: -250 });
   page.openEl.click = () => { page.openClicks++; }; // 点击落空（模拟挂载但无响应窗口期）

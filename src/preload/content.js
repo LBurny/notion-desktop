@@ -100,6 +100,9 @@ window.addEventListener('click', (e) => {
 
 window.addEventListener('keydown', (e) => {
   if (!qfArmed) return;
+  // 输入法组合中（中文拼音/日文等）的 Enter/Escape 是「提交候选/取消候选」，
+  // 不是选中结果/关闭浮层：误判会在打字时直接开新标签，或把刚待命的流程解除
+  if (e.isComposing || e.keyCode === 229) return;
   if (e.key === 'Escape') {
     // 只有搜索浮层（带输入框）真的开着才算用户主动取消；
     // 主进程预热时会送 Escape 关其它浮层（如推广条），那种不算
@@ -141,7 +144,7 @@ function sidebarStateOf(root) {
   if (!sb || typeof sb.getBoundingClientRect !== 'function') return null;
   return sb.getBoundingClientRect().x > -125 ? 'open' : 'closed';
 }
-function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, sleep, maxAttempts = 12 }) {
+function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, sleep, isHidden = () => false, maxAttempts = 12 }) {
   let gen = 0;
   return async function toggleSidebar(cfg) {
     const myGen = ++gen;
@@ -152,7 +155,7 @@ function createSidebarToggleRunner({ pickTopbarButton, sidebarStateOf, getRoot, 
       return wantOpen ? s === 'open' : s === 'closed';
     };
     for (let n = 0; n < maxAttempts; n++) {
-      if (myGen !== gen || flipped()) return;
+      if (myGen !== gen || isHidden() || flipped()) return;
       const el = pickTopbarButton(getRoot(), sels);
       if (el) el.click();
       await sleep(Math.min(250 + n * 200, 900)); // 按钮可能尚未挂载，退避重试（总窗口约 9s）
@@ -213,6 +216,8 @@ const sidebarToggle = createSidebarToggleRunner({
   pickTopbarButton, sidebarStateOf,
   getRoot: () => document,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  // 视图转后台即停止补点：切走的标签在后台反复点 ☰/收钮会改掉共享的侧栏状态
+  isHidden: () => document.visibilityState !== 'visible',
 });
 
 // 非开关动作（Share/☆/⋯）：同样重试到按钮挂载（冷启动实测按钮比窗口晚 5~10s 才到，

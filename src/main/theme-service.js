@@ -20,24 +20,69 @@ function shouldAcceptReport(reported, current, elapsedMs, graceMs = GRACE_MS) {
   return true;
 }
 
-function createThemeService({ themeFile, initial, onApplied, now = () => Date.now() }) {
+function createThemeService({ themeFile, initial, onApplied, now = () => Date.now(), schedule, cancel } = {}) {
   let current = initial === 'dark' ? 'dark' : 'light';
   const bootedAt = now();
+  // 默认调度器不 keep-alive 进程：退出时挂着的宽限期重采定时器不应拖延进程结束
+  const later = schedule || ((fn, ms) => {
+    const timer = setTimeout(fn, ms);
+    if (timer && typeof timer.unref === 'function') timer.unref();
+    return timer;
+  });
+  const cancelTimer = cancel || ((timer) => clearTimeout(timer));
+  let deferred = null; // { theme, timer }：宽限期内被拒、待宽限期结束后再采的上报
+
+  function cancelDeferred() {
+    if (!deferred) return;
+    cancelTimer(deferred.timer);
+    deferred = null;
+  }
+
+  function apply(theme, changed) {
+    current = theme;
+    if (changed && themeFile) saveTheme(themeFile, theme);
+    // 即便主题未变也触发 onApplied：持久化 dark 时启动早期那次 NC 设置可能因
+    // 窗口尚未就绪而未生效，Notion 上报 dark（此时窗口已就绪）需要这次重设机会，
+    // 否则 Win10 无边框窗口的 1px 白边会一直残留（跨机器时序差异根因）
+    if (onApplied) onApplied(theme);
+  }
+
+  // preload 只在主题**变化**时上报：宽限期内这次 light 被拒后，若页面一直就是
+  // light 便再无重报机会（content.js 的 last 已记成 light），外壳会永久停在 dark。
+  // 所以被拒的上报要记下来，宽限期结束时自己再采一次。
+  function deferRejected(theme, elapsed) {
+    cancelDeferred();
+    const waitMs = Math.max(0, GRACE_MS - elapsed);
+    deferred = {
+      theme,
+      timer: later(() => {
+        const pending = deferred && deferred.theme;
+        deferred = null;
+        if (pending && pending !== current) apply(pending, true);
+      }, waitMs),
+    };
+  }
+
   return {
     get: () => current,
     // 返回是否接受了上报（落盘/回调发生）；重复主题与假象上报都算未接受
     report(theme, at = now()) {
       if (theme !== 'dark' && theme !== 'light') return false;
-      const changed = theme !== current;
+      if (theme === current) {
+        // 页面已确认与外壳一致：撤销宽限期内排下的重采，避免之后再被翻回 light
+        cancelDeferred();
+        apply(theme, false);
+        return false;
+      }
+      const elapsed = at - bootedAt;
       // 宽限期只拦"与持久化 dark 冲突的 light 假象"；dark 上报任何时刻放行
-      if (changed && !shouldAcceptReport(theme, current, at - bootedAt)) return false;
-      current = theme;
-      if (changed && themeFile) saveTheme(themeFile, theme);
-      // 即便主题未变也触发 onApplied：持久化 dark 时启动早期那次 NC 设置可能因
-      // 窗口尚未就绪而未生效，Notion 上报 dark（此时窗口已就绪）需要这次重设机会，
-      // 否则 Win10 无边框窗口的 1px 白边会一直残留（跨机器时序差异根因）
-      if (onApplied) onApplied(theme);
-      return changed;
+      if (!shouldAcceptReport(theme, current, elapsed)) {
+        deferRejected(theme, elapsed);
+        return false;
+      }
+      cancelDeferred();
+      apply(theme, true);
+      return true;
     },
   };
 }

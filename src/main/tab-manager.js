@@ -127,22 +127,40 @@ function themeBackground(theme) {
 //             实测 window.open('https://www.notion.so/signed/attachment:<uuid>:<文件名>?table=block&id=…')）
 // notion-page 站内页面链接 → 开应用内标签
 // external    其余交给系统浏览器
-const AUTH_POPUP_PREFIXES = [
-  'https://accounts.google.com', 'https://appleid.apple.com',
-  'https://login.microsoftonline.com', 'https://login.live.com',
-  'https://auth.openai.com', 'https://auth0.openai.com',
+// 一律按 URL 解析出的主机名整段比对：字符串前缀会把 www.notion.so.evil.com 当成
+// 自家页面、accounts.google.com.evil.com 当成登录弹窗（放行真窗口）
+const AUTH_POPUP_HOSTS = [
+  'accounts.google.com', 'appleid.apple.com',
+  'login.microsoftonline.com', 'login.live.com',
+  'auth.openai.com', 'auth0.openai.com',
 ];
-const NOTION_FILE_URL_PREFIXES = [
-  'https://www.notion.so/signed/', // 附件签名跳转地址（302 → file.notion.so）
-  'https://file.notion.so/',       // 文件服务直链
-  'https://prod-files-secure.s3.us-west-2.amazonaws.com/', // 旧版 S3 直链
+const NOTION_FILE_HOSTS = [
+  'file.notion.so',       // 文件服务直链
+  'prod-files-secure.s3.us-west-2.amazonaws.com', // 旧版 S3 直链
 ];
+const NOTION_PAGE_HOSTS = ['www.notion.so', 'notion.so'];
+
+function hostMatches(hostname, host) {
+  return hostname === host || hostname.endsWith('.' + host);
+}
+
+function parseHttpsUrl(url) {
+  if (typeof url !== 'string') return null;
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'https:') return null;
+  return u;
+}
 
 function classifyWindowOpen(url) {
-  if (AUTH_POPUP_PREFIXES.some((p) => url.startsWith(p))) return 'auth-popup';
+  const u = parseHttpsUrl(url);
+  if (!u) return 'external';
+  const host = u.hostname.toLowerCase();
+  if (AUTH_POPUP_HOSTS.some((h) => hostMatches(host, h))) return 'auth-popup';
+  if (NOTION_FILE_HOSTS.some((h) => hostMatches(host, h))) return 'download';
   // /signed/ 是 www.notion.so 子路径，必须先于页面规则判断
-  if (NOTION_FILE_URL_PREFIXES.some((p) => url.startsWith(p))) return 'download';
-  if (url.startsWith('https://www.notion.so') || url.startsWith('https://notion.so')) return 'notion-page';
+  if (host === 'www.notion.so' && u.pathname.startsWith('/signed/')) return 'download';
+  if (NOTION_PAGE_HOSTS.includes(host)) return 'notion-page';
   return 'external';
 }
 

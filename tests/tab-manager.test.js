@@ -154,3 +154,22 @@ test('classifyWindowOpen：/signed/ 不得被 notion.so 页面规则抢走（顺
   const u = 'https://www.notion.so/signed/attachment%3Auuid%3Aa.doc?table=block';
   assert.notStrictEqual(classifyWindowOpen(u), 'notion-page');
 });
+
+// 前缀匹配会把「主域名开头」的仿冒域当成自家域：www.notion.so.evil.com 曾被判成
+// notion-page（在应用标签里打开，走 persist:notion 会话），accounts.google.com.evil.com
+// 曾被判成 auth-popup（放行成真窗口）。必须按主机名整段匹配。
+test('classifyWindowOpen：仿冒域按主机名判 external，不得被前缀骗过', () => {
+  assert.strictEqual(classifyWindowOpen('https://www.notion.so.evil.com/x'), 'external');
+  assert.strictEqual(classifyWindowOpen('https://notion.so.evil.com/Page1'), 'external');
+  assert.strictEqual(classifyWindowOpen('https://accounts.google.com.evil.com/o/oauth2/auth'), 'external');
+  assert.strictEqual(classifyWindowOpen('https://login.microsoftonline.com.attacker.net/x'), 'external');
+  assert.strictEqual(classifyWindowOpen('https://www.notion.so:8443/Page1'), 'notion-page', '端口不影响主机判定');
+  assert.strictEqual(classifyWindowOpen('https://WWW.NOTION.SO/Page1'), 'notion-page', '主机名大小写不敏感');
+});
+
+test('classifyWindowOpen：非 https / 非法 URL 一律 external（不抛异常）', () => {
+  assert.strictEqual(classifyWindowOpen('http://www.notion.so/Page1'), 'external');
+  assert.strictEqual(classifyWindowOpen('not a url'), 'external');
+  assert.strictEqual(classifyWindowOpen(''), 'external');
+  assert.strictEqual(classifyWindowOpen(null), 'external');
+});

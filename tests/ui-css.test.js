@@ -24,6 +24,22 @@ test('default.css 恢复左区侧栏把手的 pointer-events（悬停 peek 触�
     '.notion-open-sidebar 必须可 hover/点击');
 });
 
+// 弹层里的代码与公式必须分开：曾把 [role="dialog"] .katex 和代码块写在同一条规则里，
+// 公式被套上 Consolas（等宽）。设置 CSS 的数学字体链恰好盖住，机器没装
+// Times New Roman / Modern 系时（mathChain 为空）就露出等宽公式。
+test('default.css 弹层公式不得套代码字体（.katex 不参与 Consolas 规则）', () => {
+  const rules = [...DEFAULT_CSS.matchAll(/([^{}]+)\{([^}]*)\}/g)];
+  const codeRulesOnMath = rules.filter(([, sel, body]) => /\bkatex\b/.test(sel) && /Consolas/.test(body));
+  assert.deepEqual(
+    codeRulesOnMath.map(([, sel]) => sel.trim()),
+    [],
+    '公式被写成等宽字体（与代码块规则混在一起）',
+  );
+  const mathRule = rules.find(([, sel, body]) => /\[role="dialog"\]\s*\.katex\b/.test(sel) && /font-family/.test(body));
+  assert.ok(mathRule, '弹层公式缺少字体规则（应回落到数学字体栈）');
+  assert.ok(/KaTeX_Main|Times New Roman/.test(mathRule[2]), '弹层公式应使用数学/衬线字体栈');
+});
+
 // ── 标题栏与内容之间的分割线（随主题变色） ──
 test('标题栏样式表定义明暗两套 --divider 并用于底部分割线', () => {
   assert.ok(/html\[data-theme="light"\][^{}]*\{[^}]*--divider:/.test(TITLEBAR_CSS), '缺少浅色 --divider');

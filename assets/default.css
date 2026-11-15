@@ -138,10 +138,14 @@ input[type="text"] *,
   font-family: "思源宋体 CN", "Times New Roman", "Source Han Serif CN", "Noto Serif CJK SC", "Microsoft YaHei", serif !important;
 }
 [role="dialog"] .notion-code-block,
-[role="dialog"] .notion-code-block *,
+[role="dialog"] .notion-code-block * {
+  font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
+}
+/* 弹层里的公式是数学字体，不是等宽（曾与上面的代码块规则写在一起被套成 Consolas；
+   设置 CSS 的数学链在多数机器上恰好盖住，机器没装 Times New Roman/Modern 系时露出等宽） */
 [role="dialog"] .katex,
 [role="dialog"] .katex * {
-  font-family: "Consolas", "SFMono-Regular", "Menlo", "Monaco", "Courier New", monospace !important;
+  font-family: "KaTeX_Main", "Times New Roman", serif !important;
 }
 
 /* ========== 加粗字重调整 ========== */

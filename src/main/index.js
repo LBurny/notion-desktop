@@ -28,6 +28,7 @@ const { createTabs } = require('./tabs');
 const { createSettingsWindows } = require('./settings-windows');
 const { attachRequestFilter } = require('./request-filter');
 const { resolveTrayAction } = require('./tray-actions');
+const { windowClosePlan } = require('./close-action');
 const { syncLoginItem, shouldStartHidden } = require('./login-item');
 const { resolveLanguage } = require('../renderer/shared/i18n');
 
@@ -102,6 +103,12 @@ function showTrayMenu(trayBounds) {
 
 function currentLanguage() {
   return resolveLanguage(styleSettings ? styleSettings.language : 'auto', app.getLocale());
+}
+
+// 主窗可能已销毁（退出流程/异常）：托盘与全局快捷键回调一律先过这道闸，
+// 否则 isVisible()/show() 会对已销毁窗口抛 "Object has been destroyed"
+function winAlive() {
+  return !!win && !win.isDestroyed();
 }
 
 function openSettingsWindow(kind) {
@@ -212,13 +219,20 @@ function createWindow({ startHidden = false } = {}) {
   win.on('unmaximize', () => titlebarView.webContents.send('window-maximized', false));
 
   win.on('close', (e) => {
-    if (isQuitting) return;
-    if (styleSettings && styleSettings.closeAction === 'quit') {
+    // 决策归 close-action.js：quit 分支必须主动 app.quit()——缓存的托盘菜单窗/
+    // 设置窗是隐藏但未销毁的窗口，会让 window-all-closed 永不触发（进程残留，
+    // 之后托盘点击对已销毁的 win 抛 "Object has been destroyed"）
+    const plan = windowClosePlan({
+      closeAction: styleSettings && styleSettings.closeAction,
+      isQuitting,
+    });
+    if (plan.preventDefault) e.preventDefault();
+    if (plan.hide) win.hide();
+    if (plan.quit) {
+      // setImmediate：不在 close 事件栈里重入 app.quit（避免二次关闭被忽略）
       isQuitting = true;
-      return; // 不拦截，窗口关闭后 window-all-closed 退出程序
+      setImmediate(() => app.quit());
     }
-    e.preventDefault();
-    win.hide();
   });
 }
 
@@ -281,12 +295,12 @@ app.whenReady().then(() => {
   hotkeys = createHotkeys({
     globalShortcut,
     comboToAccelerator,
-    isFocused: () => win.isFocused(),
+    isFocused: () => winAlive() && win.isFocused(),
     getCombos: () => (styleSettings ? styleSettings.hotkeys : null),
     actions: {
       zoomIn: () => adjustZoom(0.01),
       zoomOut: () => adjustZoom(-0.01),
-      toggleWindow: () => { if (win.isVisible()) { win.hide(); } else { win.show(); } },
+      toggleWindow: () => { if (!winAlive()) return; if (win.isVisible()) { win.hide(); } else { win.show(); } },
       nextTab: () => { if (tabs) tabs.nextTab(); },
       prevTab: () => { if (tabs) tabs.prevTab(); },
     },
@@ -350,7 +364,7 @@ app.whenReady().then(() => {
 
   tray = new Tray(path.join(__dirname, '..', '..', 'assets', 'tray.png'));
   tray.setToolTip('Notion Desktop');
-  tray.on('click', () => { if (win.isVisible()) { win.hide(); } else { win.show(); } });
+  tray.on('click', () => { if (!winAlive()) return; if (win.isVisible()) { win.hide(); } else { win.show(); } });
   tray.on('right-click', (_e, bounds) => showTrayMenu(bounds));
 
   ipcMain.on('tray-menu-action', (_e, action) => {
@@ -358,7 +372,7 @@ app.whenReady().then(() => {
     // 分派表在 tray-actions.js（纯函数）：open 才弹主窗，style/settings 只开子窗口
     const plan = resolveTrayAction(action);
     if (plan.quit) { isQuitting = true; app.quit(); return; }
-    if (plan.showMain) win.show();
+    if (plan.showMain && winAlive()) win.show();
     if (plan.settingsKind) openSettingsWindow(plan.settingsKind);
   });
 
