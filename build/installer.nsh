@@ -7,6 +7,14 @@
 ; MUI 的 LEAVE 函数会先调 MUI_PAGE_CUSTOMFUNCTION_LEAVE（ ours），再自动读 Run
 ; 复选框并调 StartApp——所以我们只需在 LEAVE 里持久化状态 + 建桌面快捷方式，
 ; 运行程序由 MUI 自行处理。
+;
+; 快捷方式的选择存在 "DesktopShortcutV2"，不再读旧值 "DesktopShortcut"：旧值可能是历史版本
+; 误写（v0.2.2 完成页两个复选框重叠、点「运行程序」会连带把快捷方式选项点掉），无法与
+; 用户的真实选择区分；一旦残留 0，此后每次安装都静默默认不勾选、不建快捷方式（v0.2.13
+; 实测：注册表残留 0，用户装完桌面没有图标）。换新值名让旧脏值失效：只认新版安装器明确
+; 写入的 0，其余（缺失/旧版残留）一律默认勾选。
+; 快捷方式在完成页 LEAVE 创建（installSection 因 createDesktopShortcut=false 不建），
+; 所以直接关掉向导不会建，属已知取舍。
 
 !macro customFinishPage
   Var NDShortcutCheckbox
@@ -34,10 +42,10 @@
   Var mui.FinishPage.Run
 
   Function FinishPageShow
-    ; 从注册表读取上次选择（首次安装为空 → 默认勾选）
-    ReadRegStr $NDShortcutState HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut"
+    ; 读取上次选择：快捷方式只信任新版值（旧值不可信，见文件头），运行程序照旧
+    ReadRegStr $NDShortcutState HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcutV2"
     ReadRegStr $NDRunState HKCU "${INSTALL_REGISTRY_KEY}" "RunAfterFinish"
-    ${If} $NDShortcutState == ""
+    ${If} $NDShortcutState != "0"
       StrCpy $NDShortcutState "1"
     ${EndIf}
     ${If} $NDRunState == ""
@@ -68,9 +76,10 @@
     ${NSD_GetState} $NDShortcutCheckbox $NDShortcutState
     SendMessage $mui.FinishPage.Run ${BM_GETCHECK} 0 0 $NDRunState
 
-    ; 持久化到注册表供下次安装恢复
-    WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut" $NDShortcutState
+    ; 持久化到注册表供下次安装恢复；顺手清掉不可信的旧值
+    WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcutV2" $NDShortcutState
     WriteRegStr HKCU "${INSTALL_REGISTRY_KEY}" "RunAfterFinish" $NDRunState
+    DeleteRegValue HKCU "${INSTALL_REGISTRY_KEY}" "DesktopShortcut"
 
     ; 勾选了桌面快捷方式则创建（installSection 因 createDesktopShortcut=false 未创建）
     ${If} $NDShortcutState == ${BST_CHECKED}
@@ -86,4 +95,16 @@
   !define MUI_PAGE_CUSTOMFUNCTION_SHOW FinishPageShow
   !define MUI_PAGE_CUSTOMFUNCTION_LEAVE FinishPageLeave
   !insertmacro MUI_PAGE_FINISH
+!macroend
+
+; 卸载时清掉桌面快捷方式：createDesktopShortcut=false 会定义 DO_NOT_CREATE_DESKTOP_SHORTCUT，
+; electron-builder 卸载段里删除快捷方式的那几行带同名 !ifndef 守卫、被整段编译掉，
+; 所以卸载后一直残留死链接。更新（isUpdated）时保留——升级不该删掉用户的桌面图标；
+; $newDesktopLink 由卸载段前面的 setLinkVars 填好。
+!macro customUnInstall
+  ${ifNot} ${isUpdated}
+    WinShell::UninstShortcut "$newDesktopLink"
+    Delete "$newDesktopLink"
+    System::Call 'Shell32::SHChangeNotify(i 0x8000000, i 0, i 0, i 0)'
+  ${endif}
 !macroend
